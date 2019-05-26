@@ -1,5 +1,14 @@
-import {useBoardByUrlService, StringDict} from './BoardService'
-import React from "react";
+import {StringDict, useBoardByUrlService} from './BoardService'
+import React, {useState} from "react";
+
+export interface Drag {
+	svgPiece: SVGSVGElement,
+	originMouseX: number,
+	originMouseY: number,
+	originPieceX: number,
+	originPieceY: number,
+	moveFrom: string
+}
 
 interface SvgBoardProps {
 	svgobj: Element | null;
@@ -45,27 +54,44 @@ function modifyTransform(piece: SVGSVGElement, transX: number, transY: number) {
 	piece.setAttribute('transform', transstr);
 }
 
+const getPiecePosition: (elem: SVGSVGElement) => [number, number] = (elem) => {
+	// A click on a piece icon will contain its position transform
+	let trans = elem.getAttribute('transform');
+	let [x, y] = readTransform(elem);
+	let rect = elem.getBoundingClientRect();
+	x += rect.width / 2;
+	y += rect.height / 2;
+	x = 20 + 45 * Math.floor((x - 20) / 45);
+	y = 20 + 45 * Math.floor((y - 20) / 45);
+	return [x, y]
+
+};
+
+const adjustPiecePosition = (elem: SVGSVGElement) => {
+	let [x, y] = getTransformPosition(elem);
+	modifyTransform(elem, x, y);
+};
+
+const getTransformPosition: (elem: SVGSVGElement) => [number, number] = (elem) => {
+	let [x, y] = readTransform(elem);
+	let rect = elem.getBoundingClientRect();
+	x += rect.width / 2;
+	y += rect.height / 2;
+	x = 20 + 45 * Math.floor((x - 20) / 45);
+	y = 20 + 45 * Math.floor((y - 20) / 45);
+	return [x, y];
+};
+
+
 /**
  * Returns the square as a string from an svg target (square or piece)
  * @param elem
  */
 const findSquareFromSvgTarget = (elem: SVGSVGElement) => {
-	// A click on a piece icon will contain its position transform
 	if ('transform' in elem.attributes) {
-		let trans = elem.getAttribute('transform');
-		if (trans) {
-			let [x, y] = readTransform(elem);
-			let rect = elem.getBoundingClientRect();
-			x += rect.width / 2;
-			y += rect.height / 2;
-			x = 20 + 45 * Math.floor((x - 20) / 45);
-			y = 20 + 45 * Math.floor((y - 20) / 45);
-			// Concat position file/rank to e.g. 'c6'
-			let square: string = files[x] + ranks[y];
-			modifyTransform(elem, x, y);
-			return square;
-		}
-		// No click position information
+		let [x, y] = getTransformPosition(elem);
+		let square: string = files[x] + ranks[y];
+		return square;
 	}
 	if ('class' in elem.attributes) {
 		let rect_class = elem.getAttribute('class');
@@ -95,17 +121,26 @@ interface IMoveResponse {
  */
 const BoardViewer: React.FC<{}> = () => {
 	const {service, board, doFetch} = useBoardByUrlService();
+	let drag: Drag | null = null;
+	const updateSvgArrows = (resp: IMoveResponse) => {
+		// TODO implement
+	};
 
 	const handleFetchMoveResponse = (squareUpped: string, resp: IMoveResponse) => {
 		if ('success' in resp) {
 			if (resp.success) {
-				if (board.dragging) {
+				if (drag) {
+					console.log('Yes this move is a success');
+					// "Capture" a piece if it is located on our move destination
+					// TODO let backend specify manipulation of other pieces
 					board.pieces.forEach((piece) => {
 						if (piece.parentNode && piece.getAttribute('onSquare') === squareUpped) {
 							piece.parentNode.removeChild(piece);
 						}
 					});
-					board.dragging.svgPiece.setAttribute('onSquare', squareUpped);
+					// Update the moved piece's position
+					drag.svgPiece.setAttribute('onSquare', squareUpped);
+					// Todo call arrows with suggestions
 					if ('suggestions' in resp) {
 						console.log('It here');
 						console.log(resp.suggestions)
@@ -113,14 +148,12 @@ const BoardViewer: React.FC<{}> = () => {
 
 				}
 			} else {
-				console.log(board.dragging);
-				if (board.dragging) {
-					modifyTransform(board.dragging.svgPiece, board.dragging.originPieceX, board.dragging.originPieceY);
+				if (drag) {
+					console.log('Move rejected! Resetting piece.');
+					modifyTransform(drag.svgPiece, drag.originPieceX, drag.originPieceY);
 				}
 			}
-
 		}
-
 	};
 
 	/**
@@ -155,7 +188,7 @@ const BoardViewer: React.FC<{}> = () => {
 			piece = (evt.target as unknown) as SVGSVGElement;
 		}
 		if (piece) {
-			board.dragging = {
+			drag = {
 				svgPiece: piece, originMouseX: m.screenX,
 				originMouseY: m.screenY, originPieceX: pieceX, originPieceY: pieceY, moveFrom: squareClicked
 			};
@@ -167,9 +200,9 @@ const BoardViewer: React.FC<{}> = () => {
 	 * @param evt: mouse event from onMouseMove
 	 */
 	const onBoardMouseMove = (evt: Event) => {
-		if (board.dragging != null) {
+		if (drag != null) {
 			let m = (evt as unknown) as React.MouseEvent;
-			let piece: SVGSVGElement = board.dragging.svgPiece;
+			let piece: SVGSVGElement = drag.svgPiece;
 			if (board.svg) {
 				let pt = board.svg.createSVGPoint();
 				pt.x = m.clientX;
@@ -194,18 +227,19 @@ const BoardViewer: React.FC<{}> = () => {
 	const onBoardMouseUp = (evt: Event) => {
 		let elem = evt.target as SVGSVGElement;
 		let squareUpped: string = findSquareFromSvgTarget(elem);
-		if (board.dragging) {
+		if (drag) {
 			console.log('In drag:');
-			console.log(board.dragging.originPieceX);
-			let move: string = board.dragging.moveFrom + squareUpped;
+			console.log(drag.originPieceX);
+			let move: string = drag.moveFrom + squareUpped;
 			console.log(move);
 
 			doFetch('move', {move: move}, (resp: IMoveResponse) => {
 				handleFetchMoveResponse(squareUpped, resp);
-				board.dragging = null;
+				adjustPiecePosition(elem);
+				drag = null;
 			}, () => {
 				// This fail means server error, not 'illegal move'
-				board.dragging = null;
+				drag = null;
 
 			});
 		}
@@ -246,6 +280,7 @@ const BoardViewer: React.FC<{}> = () => {
 				});
 				let newSvg: SVGSVGElement = head;
 				newSvg.addEventListener('mousemove', onBoardMouseMove, false);
+				newSvg.addEventListener('mouseleave', onBoardMouseUp, false);
 				others.forEach((item) => {
 					newSvg.appendChild(item);
 				});
@@ -318,3 +353,4 @@ const BoardViewer: React.FC<{}> = () => {
 };
 
 export default BoardViewer;
+

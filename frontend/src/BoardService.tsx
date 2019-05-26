@@ -1,21 +1,10 @@
 import {useState} from 'react';
 import url from './Settings'
 
-export interface Drag {
-	svgPiece: SVGSVGElement,
-	originMouseX: number,
-	originMouseY: number,
-	originPieceX: number,
-	originPieceY: number,
-	moveFrom: string
-}
-
 export interface Board {
 	svg: SVGSVGElement | null;
 	svgPoint: any;
 	pieces: HTMLElement[];
-	dragging: Drag | null;
-	moveFrom: string
 }
 
 interface ServiceInit {
@@ -89,7 +78,7 @@ const useBoardByUrlService = () => {
 
 	};
 
-	const initialBoardState: Board = {svg: null, svgPoint: null, pieces: [], dragging: null, moveFrom: '??'};
+	const initialBoardState: Board = {svg: null, svgPoint: null, pieces: []};
 	const [board, setBoard] = useState<Board>(initialBoardState);
 	return {service, board, setBoard, doFetch};
 };
