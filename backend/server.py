@@ -1,5 +1,6 @@
 from flask import jsonify, request, render_template
 from backend import app, motor
+from backend.motor import is_valid_move
 
 
 @app.route('/')
@@ -36,9 +37,10 @@ def flask_move():
     if 'move' not in req_json:
         return 'Could not parse request: No move', 400
     move = req_json['move']
+    if not is_valid_move(move):
+        return 'Not a valid move', 402
 
-    ret_dict = {'success': False, }
-    if motor.perform_move(move):
-        ret_dict['success'] = True
-        ret_dict['suggestions'] = motor.suggest_moves()
+    ret_dict = {'success': True}
+    motor.perform_move(move, ret_dict)
+    ret_dict['suggestions'] = motor.suggest_moves()
     return jsonify(ret_dict), 200

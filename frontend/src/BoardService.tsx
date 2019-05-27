@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import url from './Settings'
+import {url} from './Settings'
 
 export interface Board {
 	svg: SVGSVGElement | null;

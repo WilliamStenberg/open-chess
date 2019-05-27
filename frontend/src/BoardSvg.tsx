@@ -1,5 +1,12 @@
 import {StringDict, useBoardByUrlService} from './BoardService'
-import React, {useState} from "react";
+import React from 'react';
+import {arrowColor} from './Settings';
+
+type Coord = [number, number];
+type CoordPair = [Coord, Coord];
+
+const SQUARE_SIZE = 45;
+const SVG_OFFSET = 20;
 
 export interface Drag {
 	svgPiece: SVGSVGElement,
@@ -8,6 +15,14 @@ export interface Drag {
 	originPieceX: number,
 	originPieceY: number,
 	moveFrom: string
+}
+
+/**
+ * The response from the server when passing a move
+ */
+interface IMoveResponse {
+	success: boolean,
+	suggestions: string[]
 }
 
 interface SvgBoardProps {
@@ -26,6 +41,21 @@ const ranks: SquareDict = [0, 1, 2, 3, 4, 5, 6, 7].reduce((obj: SquareDict, x) =
 	obj[20 + 45 * (7 - x)] = String(x + 1);
 	return obj;
 }, {});
+
+const squareToCoordinate: (_: string) => Coord = (square: string) => {
+	let x = 0, y = 0;
+	for (let key of Object.keys(files)) {
+		if (files[+key] === square[0]) {
+			x = +key;
+		}
+	}
+	for (let key of Object.keys(ranks)) {
+		if (ranks[+key] === square[1]) {
+			y = +key;
+		}
+	}
+	return [x, y];
+};
 
 /**
  * Helper function to parse an SVG object for its transform property,
@@ -54,31 +84,18 @@ function modifyTransform(piece: SVGSVGElement, transX: number, transY: number) {
 	piece.setAttribute('transform', transstr);
 }
 
-const getPiecePosition: (elem: SVGSVGElement) => [number, number] = (elem) => {
-	// A click on a piece icon will contain its position transform
-	let trans = elem.getAttribute('transform');
-	let [x, y] = readTransform(elem);
-	let rect = elem.getBoundingClientRect();
-	x += rect.width / 2;
-	y += rect.height / 2;
-	x = 20 + 45 * Math.floor((x - 20) / 45);
-	y = 20 + 45 * Math.floor((y - 20) / 45);
-	return [x, y]
-
-};
-
 const adjustPiecePosition = (elem: SVGSVGElement) => {
 	let [x, y] = getTransformPosition(elem);
 	modifyTransform(elem, x, y);
 };
 
-const getTransformPosition: (elem: SVGSVGElement) => [number, number] = (elem) => {
+const getTransformPosition: (elem: SVGSVGElement) => Coord = (elem) => {
 	let [x, y] = readTransform(elem);
 	let rect = elem.getBoundingClientRect();
 	x += rect.width / 2;
 	y += rect.height / 2;
-	x = 20 + 45 * Math.floor((x - 20) / 45);
-	y = 20 + 45 * Math.floor((y - 20) / 45);
+	x = SVG_OFFSET + SQUARE_SIZE * Math.floor((x - SVG_OFFSET) / SQUARE_SIZE);
+	y = SVG_OFFSET + SQUARE_SIZE * Math.floor((y - SVG_OFFSET) / SQUARE_SIZE);
 	return [x, y];
 };
 
@@ -90,8 +107,7 @@ const getTransformPosition: (elem: SVGSVGElement) => [number, number] = (elem) =
 const findSquareFromSvgTarget = (elem: SVGSVGElement) => {
 	if ('transform' in elem.attributes) {
 		let [x, y] = getTransformPosition(elem);
-		let square: string = files[x] + ranks[y];
-		return square;
+		return files[x] + ranks[y];
 	}
 	if ('class' in elem.attributes) {
 		let rect_class = elem.getAttribute('class');
@@ -107,13 +123,11 @@ const findSquareFromSvgTarget = (elem: SVGSVGElement) => {
 	return '??';
 };
 
-/**
- * The response from the server when passing a move
- */
-interface IMoveResponse {
-	success: boolean,
-	suggestions: string[]
-}
+
+const stringMoveToCoordinates: (_: string) => CoordPair = (item: string) => {
+	let fromSquare = item.slice(0, 2), toSquare = item.slice(2, 4);
+	return [squareToCoordinate(fromSquare), squareToCoordinate(toSquare)];
+};
 
 /**
  * The view of the chess board, containing SvgBoard for rendering SVG board,
@@ -122,15 +136,79 @@ interface IMoveResponse {
 const BoardViewer: React.FC<{}> = () => {
 	const {service, board, doFetch} = useBoardByUrlService();
 	let drag: Drag | null = null;
+
+	/**
+	 * From a given coordinate pair (parsed from a move),
+	 * create an SVG object for an arrow having
+	 */
+	const constructArrow: (_: CoordPair) => SVGGElement = (coordPair: CoordPair) => {
+		let doc: SVGLineElement = document.createElementNS("http://www.w3.org/2000/svg",
+			"line");
+		// Adjusting positions for center-square coordinates
+		let x1 = coordPair[0][0] + SQUARE_SIZE / 2;
+		let x2 = coordPair[1][0] + SQUARE_SIZE / 2;
+		let y1 = coordPair[0][1] + SQUARE_SIZE / 2;
+		let y2 = coordPair[1][1] + SQUARE_SIZE / 2;
+
+		x2 -= Math.min(0.1 * (x2 - x1), SQUARE_SIZE / 4);
+		y2 -= Math.min(0.1 * (y2 - y1), SQUARE_SIZE / 4);
+
+
+		doc.setAttribute("x1", "" + x1);
+		doc.setAttribute("y1", "" + y1);
+		doc.setAttribute("x2", "" + x2);
+		doc.setAttribute("y2", "" + y2);
+		doc.setAttribute("stroke", arrowColor);
+		doc.setAttribute("stroke-width", "7");
+		doc.setAttribute("marker-end", "url(#arrowhead)");
+		doc.setAttribute("opacity", "0.9");
+
+		let g: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg",
+			'g');
+		g.setAttribute('opacity', '0.7');
+		g.appendChild(doc);
+		return g;
+
+	};
+
+	/**
+	 * Clears all arrows on board and feeds fetched suggested move list
+	 * to constructArrow.
+	 */
 	const updateSvgArrows = (resp: IMoveResponse) => {
-		// TODO implement
+		if (board.svg) {
+			let toBeRemoved: Node[] = [];
+			// Select first piece, to insert before it
+			let firstPiece = ((svg) => {
+				let found = null;
+				for (let [, tag] of svg.childNodes.entries()) {
+					if (!found && tag.nodeName === 'use') {
+						found = tag;
+					} else if (tag.nodeName === 'g') {
+						// Remove 'g' elements containing arrows
+						toBeRemoved = toBeRemoved.concat(tag);
+					}
+
+				}
+				return found;
+			})(board.svg);
+			toBeRemoved.forEach(item => board.svg && board.svg.removeChild(item));
+			resp.suggestions.forEach((item: string) => {
+				let coordPair = stringMoveToCoordinates(item);
+				let arrowForm = constructArrow(coordPair);
+				board.svg && board.svg.insertBefore(arrowForm, firstPiece);
+			});
+
+
+		} else {
+			console.log('WEIRD: update arrows when no svg?')
+		}
 	};
 
 	const handleFetchMoveResponse = (squareUpped: string, resp: IMoveResponse) => {
 		if ('success' in resp) {
 			if (resp.success) {
 				if (drag) {
-					console.log('Yes this move is a success');
 					// "Capture" a piece if it is located on our move destination
 					// TODO let backend specify manipulation of other pieces
 					board.pieces.forEach((piece) => {
@@ -141,17 +219,12 @@ const BoardViewer: React.FC<{}> = () => {
 					// Update the moved piece's position
 					drag.svgPiece.setAttribute('onSquare', squareUpped);
 					// Todo call arrows with suggestions
-					if ('suggestions' in resp) {
-						console.log('It here');
-						console.log(resp.suggestions)
-					}
+					updateSvgArrows(resp);
+
 
 				}
 			} else {
-				if (drag) {
-					console.log('Move rejected! Resetting piece.');
-					modifyTransform(drag.svgPiece, drag.originPieceX, drag.originPieceY);
-				}
+
 			}
 		}
 	};
@@ -228,23 +301,24 @@ const BoardViewer: React.FC<{}> = () => {
 		let elem = evt.target as SVGSVGElement;
 		let squareUpped: string = findSquareFromSvgTarget(elem);
 		if (drag) {
-			console.log('In drag:');
-			console.log(drag.originPieceX);
 			let move: string = drag.moveFrom + squareUpped;
-			console.log(move);
 
 			doFetch('move', {move: move}, (resp: IMoveResponse) => {
 				handleFetchMoveResponse(squareUpped, resp);
+				// Snapping piece to grid
 				adjustPiecePosition(elem);
 				drag = null;
 			}, () => {
-				// This fail means server error, not 'illegal move'
+				// This fail means server error, or 'illegal move'
+				if (drag) {
+					console.log('Move rejected! Resetting piece.');
+					modifyTransform(drag.svgPiece, drag.originPieceX, drag.originPieceY);
+				}
 				drag = null;
 
 			});
 		}
 	};
-
 
 	type LoadBoardDict = { empty: boolean, moves: string };
 	/**
@@ -255,12 +329,14 @@ const BoardViewer: React.FC<{}> = () => {
 	const loadBoard = (props: LoadBoardDict) => {
 		doFetch('svg', {}, (resp: StringDict) => {
 			if ('svg' in resp) {
-				let doc = new DOMParser().parseFromString(resp['svg'], 'application/xml');
-				let givenSvg = doc.documentElement as HTMLElement;
+				const doc = new DOMParser().parseFromString(resp['svg'], 'application/xml');
+				const givenSvg = doc.documentElement as HTMLElement;
+				const head: SVGSVGElement = givenSvg.cloneNode() as SVGSVGElement;
 				let tags: NodeList = givenSvg.childNodes;
+				let squares: HTMLElement[] = [];
 				let pieces: HTMLElement[] = [];
+				let defs: HTMLElement = givenSvg;
 				let others: HTMLElement[] = [];
-				let head: SVGSVGElement = givenSvg.cloneNode() as SVGSVGElement;
 				tags.forEach((value: Node, key, parent) => {
 					let elem = value as HTMLElement;
 					if (value.nodeName === 'rect') {
@@ -273,16 +349,46 @@ const BoardViewer: React.FC<{}> = () => {
 							piece.addEventListener('mousemove', onBoardMouseMove, false);
 							pieces = pieces.concat(piece);
 						}
+						squares = squares.concat(elem);
 						elem.addEventListener('mousedown', onBoardMouseDown, false);
 
+					} else if (value.nodeName === 'defs') {
+						defs = elem;
+					} else {
+						others = others.concat(elem);
 					}
-					others = others.concat(elem);
 				});
+
+				// Adding arrow support
+				if (defs && defs.firstChild) {
+					// Inserts the arrow form into <defs> tag
+					let arrowForm = document.createElementNS('http://www.w3.org/2000/svg',
+						'marker');
+					arrowForm.setAttribute('id', 'arrowhead');
+					arrowForm.setAttribute('markerWidth', '3');
+					arrowForm.setAttribute('markerHeight', '4');
+					arrowForm.setAttribute('refX', '1.5');
+					arrowForm.setAttribute('refY', '2');
+					arrowForm.setAttribute('orient', 'auto');
+					arrowForm.setAttribute('fill', arrowColor);
+
+					let poly = document.createElementNS('http://www.w3.org/2000/svg',
+						'polygon');
+					poly.setAttribute('points', '0 0, 3 2, 0 4');
+					arrowForm.appendChild(poly);
+
+					defs.appendChild(arrowForm);
+				}
+
 				let newSvg: SVGSVGElement = head;
 				newSvg.addEventListener('mousemove', onBoardMouseMove, false);
 				newSvg.addEventListener('mouseleave', onBoardMouseUp, false);
+				newSvg.appendChild(defs);
 				others.forEach((item) => {
 					newSvg.appendChild(item);
+				});
+				squares.forEach((item) => {
+					newSvg.appendChild(item)
 				});
 				// If the pieces aren't the last objects to be drawn,
 				// dragging a piece onto a piece "higher up" will cause the piece
@@ -299,7 +405,9 @@ const BoardViewer: React.FC<{}> = () => {
 
 	// Initial empty board fetch for componentDidMount to inject
 	if (!board.svg) {
-		loadBoard({empty: true, moves: ''});
+		setTimeout(() => {
+			loadBoard({empty: true, moves: ''});
+		}, 500);
 	}
 
 	/**
@@ -312,7 +420,6 @@ const BoardViewer: React.FC<{}> = () => {
 		}
 
 		appendSvg() {
-			console.log('Run');
 			if (this.props.svgobj) {
 				let divElem = document.getElementById('boardHolder');
 				if (divElem && board.svg) {

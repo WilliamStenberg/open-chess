@@ -6,9 +6,10 @@ import chess
 import chess.polyglot
 import chess.engine
 import chess.svg
-from typing import List
+from chess import Board
+from typing import List, Dict
 
-b = chess.Board()
+b: Board = Board()
 
 reader = chess.polyglot.open_reader('Titans.bin')
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
@@ -23,21 +24,23 @@ def get_empty_board() -> chess.Board:
 
 def is_valid_move(move: str) -> bool:
     global b
-    return len(move) == 4 and chess.Move.from_uci(move) in b.legal_moves
+    if len(move) != 4 or '?' in move:
+        return False
+
+    m = chess.Move.from_uci(move)
+    return m in b.legal_moves
 
 
-def perform_move(move: str) -> bool:
+def perform_move(move: str, ret_dict) -> None:
     """
     Tries to perform move on the board, returns True if successful
     :param move: UCI move
-    :return: False if move not a legal move, True otherwise
     """
     global b
-    if not is_valid_move(move):
-        return False
+
+    # TODO extend from legal move to "good move" by Polyglot or Stockfish
     board_move = chess.Move.from_uci(move)
-    b.push(board_move)
-    return True
+    b.push(board_move)  # type: chess.Board
 
 
 def suggest_moves() -> List[str]:
