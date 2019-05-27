@@ -2,6 +2,8 @@
 Python-chess Flask app serving a TypeScript React frontend that 
 displays an interactive chess board.
 
+![Alt text](img/with_arrows.png?raw=true "Title")
+
 ## Install
 Clone this repository, run `pip install requirements.txt` from project root
 to install Python dependencies.
