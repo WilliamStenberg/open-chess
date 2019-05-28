@@ -17,12 +17,13 @@ export interface Drag {
 	moveFrom: string
 }
 
+type Suggestion = { move: string, opacity: number, label: string };
 /**
  * The response from the server when passing a move
  */
 interface IMoveResponse {
 	success: boolean,
-	suggestions: string[]
+	suggestions: Suggestion[]
 }
 
 interface SvgBoardProps {
@@ -141,7 +142,7 @@ const BoardViewer: React.FC<{}> = () => {
 	 * From a given coordinate pair (parsed from a move),
 	 * create an SVG object for an arrow having
 	 */
-	const constructArrow: (_: CoordPair) => SVGGElement = (coordPair: CoordPair) => {
+	const constructArrow: (cp: CoordPair, opacity: number, label: string) => SVGGElement = (coordPair, opacity, label) => {
 		let doc: SVGLineElement = document.createElementNS("http://www.w3.org/2000/svg",
 			"line");
 		// Adjusting positions for center-square coordinates
@@ -161,7 +162,10 @@ const BoardViewer: React.FC<{}> = () => {
 		doc.setAttribute("stroke", arrowColor);
 		doc.setAttribute("stroke-width", "7");
 		doc.setAttribute("marker-end", "url(#arrowhead)");
-		doc.setAttribute("opacity", "0.9");
+		doc.setAttribute("opacity", "" + opacity);
+		doc.addEventListener("click", () => {
+			alert('Arrow click!')
+		}, false);
 
 		let g: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg",
 			'g');
@@ -193,9 +197,12 @@ const BoardViewer: React.FC<{}> = () => {
 				return found;
 			})(board.svg);
 			toBeRemoved.forEach(item => board.svg && board.svg.removeChild(item));
-			resp.suggestions.forEach((item: string) => {
-				let coordPair = stringMoveToCoordinates(item);
-				let arrowForm = constructArrow(coordPair);
+			resp.suggestions.forEach((item: Suggestion) => {
+				let coordPair = stringMoveToCoordinates(item.move);
+				console.log('Received ' + item.opacity);
+				// Adjusting given move popularity for arrow opacity
+				let threshOpacity = Math.max(0.2, Math.min(0.8, item.opacity + 0.1));
+				let arrowForm = constructArrow(coordPair, threshOpacity, item.label);
 				board.svg && board.svg.insertBefore(arrowForm, firstPiece);
 			});
 

@@ -5,11 +5,13 @@ from backend.motor import is_valid_move
 
 @app.route('/')
 def root():
+    """ Static-serving most recent frontend build """
     return render_template('index.html')
 
 
 @app.route('/auth', methods=['POST'])
 def client_login():
+    """ Name handling from new client setting cookies """
     if not request.is_json or 'name' not in request.json:
         return 'No name in JSON request', 403
     name = request.json['name']
