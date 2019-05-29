@@ -46,16 +46,14 @@ def perform_move(move: str, ret_dict) -> None:
 
     if b.is_en_passant(board_move):
         pawn_square = move[2] + str(int(move[3]) + (-1 if b.turn else 1))
-        print(f'En passant, removing from: {pawn_square}')
         ret_dict['updates'].append(pawn_square + '??')  # Signal this is a removal
     elif b.is_kingside_castling(board_move):
         ret_dict['updates'].append('h1f1' if b.turn else 'h8f8')
     elif b.is_queenside_castling(board_move):
         ret_dict['updates'].append('h1f1' if b.turn else 'h8f8')
     else:
-        remove = board_move.from_square in b.attackers(chess.WHITE if b.turn else chess.BLACK, board_move.to_square)
+        remove = b.piece_at(board_move.to_square)
         if remove:
-            print('This is a capture')
             ret_dict['updates'].append(move[2:] + '??')
     b.push(board_move)  # type: chess.Board
 

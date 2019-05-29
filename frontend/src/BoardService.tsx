@@ -5,6 +5,7 @@ export interface Board {
 	svg: SVGSVGElement | null;
 	svgPoint: any;
 	pieces: HTMLElement[];
+	removeStack: HTMLElement[]
 }
 
 interface ServiceInit {
@@ -78,7 +79,7 @@ const useBoardByUrlService = () => {
 
 	};
 
-	const initialBoardState: Board = {svg: null, svgPoint: null, pieces: []};
+	const initialBoardState: Board = {svg: null, svgPoint: null, pieces: [], removeStack: []};
 	const [board, setBoard] = useState<Board>(initialBoardState);
 	return {service, board, setBoard, doFetch};
 };
