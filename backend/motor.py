@@ -49,9 +49,11 @@ def perform_move(move: str, ret_dict) -> None:
         print(f'En passant, removing from: {pawn_square}')
         ret_dict['updates'].append(pawn_square + '??')  # Signal this is a removal
     elif b.is_kingside_castling(board_move):
+        print('Kingside castles')
         ret_dict['updates'].append('h1f1' if b.turn else 'h8f8')
     elif b.is_queenside_castling(board_move):
-        ret_dict['updates'].append('h1f1' if b.turn else 'h8f8')
+        print('Queenside castles')
+        ret_dict['updates'].append('a1d1' if b.turn else 'a8d8')
     else:
         remove = board_move.from_square in b.attackers(chess.WHITE if b.turn else chess.BLACK, board_move.to_square)
         if remove:
@@ -71,7 +73,7 @@ def suggest_moves() -> List:
     suggested_moves = list()
     sum_weights = sum([ent.weight for ent in games])
     for entry in games:
-        move = entry.move()
+        move = entry.move
         # TODO classify suggestions depending on whether the move is known/bad/favorite
         print('{}: learn={}, weight={}'.format(move.uci(), entry.learn, entry.weight))
 
