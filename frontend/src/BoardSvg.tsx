@@ -24,6 +24,7 @@ type Suggestion = { move: string, opacity: number, label: string };
 interface IMoveResponse {
 	success: boolean,
 	suggestions: Suggestion[]
+	updates: string[]
 }
 
 interface SvgBoardProps {
@@ -66,7 +67,7 @@ const readTransform = (elem: Element) => {
 	let attr = elem.getAttribute('transform');
 	if (attr) {
 		let coord: string = attr.split('(')[1].split(')')[0];
-		let pieces: string[] = coord.split(', ');
+		let pieces: string[] = coord.split(',');
 		let x: number = +pieces[0];
 		let y: number = +pieces[1];
 		return [x, y];
@@ -163,10 +164,14 @@ const BoardViewer: React.FC<{}> = () => {
 		doc.setAttribute("stroke-width", "7");
 		doc.setAttribute("marker-end", "url(#arrowhead)");
 		doc.setAttribute("opacity", "" + opacity);
-		doc.addEventListener("click", () => {
-			alert('Arrow click!')
+		doc.addEventListener("mouseenter", () => {
+			doc.setAttribute('opacity', "" + Math.min(opacity + 0.2, 1));
+		}, false);
+		doc.addEventListener("mouseleave", () => {
+			doc.setAttribute('opacity', "" + opacity);
 		}, false);
 
+		// Wrapping in a g tag for opacity to take effect on the line marker (arrow head)
 		let g: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg",
 			'g');
 		g.setAttribute('opacity', '0.7');
@@ -199,7 +204,6 @@ const BoardViewer: React.FC<{}> = () => {
 			toBeRemoved.forEach(item => board.svg && board.svg.removeChild(item));
 			resp.suggestions.forEach((item: Suggestion) => {
 				let coordPair = stringMoveToCoordinates(item.move);
-				console.log('Received ' + item.opacity);
 				// Adjusting given move popularity for arrow opacity
 				let threshOpacity = Math.max(0.2, Math.min(0.8, item.opacity + 0.1));
 				let arrowForm = constructArrow(coordPair, threshOpacity, item.label);
@@ -212,23 +216,77 @@ const BoardViewer: React.FC<{}> = () => {
 		}
 	};
 
+	const executeFetchUpdates = (commands: string[]) => {
+		// TODO: Could be optimized by a single loop over board pieces?
+		commands.forEach((move) => {
+			let start = move.slice(0, 2), end = move.slice(2, 4);
+			if (start === '??') {
+				if (!board.removeStack) {
+					console.log('Fetched to ressurect a piece, but have empty remove stack');
+					console.log('Disregarding command');
+				} else {
+					// Fetch the object from the remove queue
+					let piece: HTMLElement | undefined;
+					piece = board.removeStack.pop();
+					if (piece) {
+						let putOnSquare = piece.getAttribute('returnSquare');
+						let returnTransform = piece.getAttribute('returnTransform');
+						if (putOnSquare && returnTransform) {
+							piece.setAttribute('onSquare', putOnSquare);
+							piece.setAttribute('display', 'default');
+							piece.setAttribute('transform', returnTransform);
+						} else {
+							console.log('Could not pop the remove stack when fetched a resurrect command');
+						}
+					} else {
+						console.log('Could not access remove stack')
+					}
+
+					// TODO resurrect a piece
+				}
+			} else if (end === '??') {
+				board.pieces.forEach((piece) => {
+					if (piece.parentNode && piece.getAttribute('onSquare') === start) {
+						//piece.parentNode.removeChild(piece);
+						piece.setAttribute('onSquare', '??');
+						piece.setAttribute('returnSquare', start);
+						piece.setAttribute('display', 'none');
+						let trans = piece.getAttribute('transform');
+						if (trans) {
+							piece.setAttribute('returnTransform', trans);
+						}
+						piece.setAttribute('transform', 'translate(0, 0)');
+						board.removeStack.push(piece);
+
+					}
+				});
+			} else { // Moving pieces
+				board.pieces.forEach((piece) => {
+					let pieceSquare = piece.getAttribute('onSquare');
+					if (start === pieceSquare) {
+						let endCoord = squareToCoordinate(end);
+						let newTrans = 'translate(' + endCoord[0] + ',' + endCoord[1] + ')';
+						piece.setAttribute('transform', newTrans);
+						piece.setAttribute('onSquare', end);
+
+					}
+				});
+			}
+		})
+	};
+
 	const handleFetchMoveResponse = (squareUpped: string, resp: IMoveResponse) => {
 		if ('success' in resp) {
 			if (resp.success) {
 				if (drag) {
 					// "Capture" a piece if it is located on our move destination
 					// TODO let backend specify manipulation of other pieces
-					board.pieces.forEach((piece) => {
-						if (piece.parentNode && piece.getAttribute('onSquare') === squareUpped) {
-							piece.parentNode.removeChild(piece);
-						}
-					});
+
+					executeFetchUpdates(resp.updates);
 					// Update the moved piece's position
 					drag.svgPiece.setAttribute('onSquare', squareUpped);
 					// Todo call arrows with suggestions
 					updateSvgArrows(resp);
-
-
 				}
 			} else {
 
