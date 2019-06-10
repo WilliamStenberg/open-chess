@@ -72,6 +72,8 @@ def suggest_moves() -> List:
     sum_weights = sum([ent.weight for ent in games])
     for entry in games:
         move = entry.move
+        if not isinstance(move, chess.Move):
+            move = move()
         # TODO classify suggestions depending on whether the move is known/bad/favorite
         print('{}: learn={}, weight={}'.format(move.uci(), entry.learn, entry.weight))
 

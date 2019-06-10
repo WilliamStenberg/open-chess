@@ -1,0 +1,80 @@
+\documentclass[architecture.tex]{subfiles}
+\begin{document}
+
+\begin{figure}[H]
+\subfile{diagram.tex}
+\caption{Entity-Relationship (ER) diagram for \textit{open-chess} database}
+\label{fig:er-diagram}
+\end{figure}
+
+The entity-relationship diagram in Figure \ref{fig:er-diagram} outlines the structure of the 
+database, implemented in SQLAlchemy in the backend of \textit{open-chess}.
+The method of drawing the diagram comes from 
+\url{https://www.guitex.org/home/images/ArsTeXnica/AT015/drawing-ER-diagrams-with-TikZ.pdf}.
+Below, each of the elements are explained in terms of their intended
+use in the application:
+
+\begin{itemize}
+    \item \textbf{Board}: Representing a chess board, i.e. a configuration
+        of pieces. The pieces themselves are not modelled in the database,
+        but during a session an active \textit{python-chess} Board
+        object will hold such information.
+
+    \item \textbf{Zobrist Hash}: A chess board is uniquely defined
+        by its Zobrist hash (TODO: cite Zobrist theory),
+        which is computed by taking into account piece positions,
+        castling rights etc, resulting in a hash string.
+    \item \textbf{Score}: A board's score is its numeric evaluation by a chess
+        engine - who's winning. A score is computed from a player's 
+        perspective to a custom format,
+        but this can be converted to a numeric value, using negative
+        values for black's advantage and positive for white's.
+    \item \textbf{Engine Time}: Since the score of a position is computed
+        by an engine (Stockfish) and this score is more precise the longer
+        the engine was allowed to think, the time that the engine has been
+        run is kept so that scores can be improved. When simply loading
+        in boards from an external source, this is set to zero
+        indicating that any score cannot be relied upon.
+    \item \textbf{Can do}: From a board there is a set of legal moves
+        that can be made from that position. Since the board state
+        implicitly convey whose turn it is to move, a board will
+        only be connected to moves for a certain side (white or black).
+    \item \textbf{Move}: Representing a legal move in a game of chess. 
+    \item \textbf{UCI}: The UCI representation of the move, 
+        comprised of the square the moved piece starts and lands on,
+        concatenated to a four-letter string, e.g. ``e2e4'', ``b1c3''.
+    \item \textbf{SAN}: The SAN representation of the move, which
+        is more commonly used by humans when talking about moves,
+        e.g. ``e4'', ``Nc3''. The SAN representation implicitly holds
+        board state information.
+    \item \textbf{ID}: Since two moves may have the same SAN and UCI
+        representations, but pertain to different board states,
+        a unique ID is required. Typically a numerical index.
+    \item \textbf{Weight}: A derived property conveying how good
+        a move is for the side making it, computed from the scores
+        of the initial and resulting boards. A negative value would indicate
+        a bad move, while a positive move is better since it improves the 
+        board score for the move-making side.
+    \item \textbf{Leads to}: The relationship between a move and the board
+        it leads to. While a board \textit{can do} many moves, a move
+        only \textit{leads to} one board.
+    \item \textbf{Player}: A registered user of the system, created
+        when they enter the application interface for the first time.
+    \item \textbf{Name}: A player is uniquely identified by a string.
+    \item \textbf{Favourite}: A player may record board positions
+        to be remembered, to quickly place the interface's board in this
+        state.
+    \item \textbf{Knows}: A player is said to know a move if they have
+        performed it in the interface. When a player knows a move,
+        the interface's \textit{game mode} expects the player to be able
+        to perform it if the session's current board \textit{can do} it.
+    \item \textbf{Rank}: Each time the game mode prompts the player for a move
+        in a board where the player knows at least one move, the player's action
+        will influence the rank of one or several moves:
+        If the player performs a known move, the rank is improved.
+        If the player performs another move (not known by the player),
+        the rank of all the known moves for that board will decrease.
+        It is thus a measure of the player's familiarity the the known move.
+\end{itemize}
+
+\end{document}

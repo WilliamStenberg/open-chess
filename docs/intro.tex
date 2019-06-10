@@ -1,0 +1,39 @@
+\documentclass[architecture.tex]{subfiles}
+\begin{document}
+This document outlines the software architecture for the 
+web-based application \textit{Open Chess} that offers
+an interactive chess board through a React Application
+served with Flask. 
+Using the application (playing a game of chess through mouse interaction),
+the user is encouraged to explore the early-game strategies of the game of chess.
+The backend of the application (written in Flask, with a SQLAlchemy database) 
+internally evaluates positions and assigns them scores. 
+The evaluation process is performed by Stockfish, a chess computer engine. 
+Stockfish is used to assign scores to board positions fed to it, 
+representing a move's soundness in the game. 
+The scores for the initial and resulting board states in a move
+form the weight of the move, taking into account 
+other avaliable moves in the initial position.
+
+The application defines \textit{book moves}, which are moves in certain
+positions of the board that are known to be good.
+These can be shown as arrows on the graphical board representation in the frontend,
+and express their weights through their visual representation.
+
+In the future, the viewing of book moves will be a feature for the player
+to manage their known chess moves with the application, through exploring
+variations of chess openings and adding new moves as they learn.
+
+The app is intended for use as a training tool, prompting the player
+to make good moves in pre-determined board positions.
+This is meant to be gamified through assigning the a \textit{rank} to each move,
+a value that varies with the player's prompted actions.
+The player evaluation could be expanded to define an 
+``experience point levelling'' type of gamification system, or a chess-style 
+``Elo ranking'' type system.
+
+The Open Chess source code is on \url{https://github.com/WilliamStenberg/open-chess},
+and is Free Software.
+
+
+\end{document}

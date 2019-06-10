@@ -1,0 +1,27 @@
+\ProvidesPackage{chesspremable}
+
+\usepackage{float}
+
+\usepackage{tikz} % TikZ Graphics
+\usepackage{hyperref} % For written URL:s
+
+% Formatting, configured for Python code
+\usepackage{listings}
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    numberstyle=\footnotesize,
+    numbers=left,
+    frame=single,
+    tabsize=2,
+    caption=,
+    escapeinside={\%*}{*)},
+    breaklines=true,
+    breakatwhitespace=true,
+    framextopmargin=2pt,
+    framexbottommargin=2pt,
+    inputencoding=utf8,
+    extendedchars=true,
+    literate={å}{{\aa}}1 {ä}{{\"a}}1 {ö}{{\"o}}1 {.}{.\allowbreak}1 {[}{[\allowbreak}1 {(}{(\allowbreak}1,
+}
+

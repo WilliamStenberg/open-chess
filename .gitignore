@@ -16,4 +16,12 @@ Session.vim
 # Auto-generated tag files
 tags
 
+# Handwritten Python/PyCharm
+__pycache__
+.idea
+
+# Handwritten LaTeX
+*.out
+*.log
+*.aux
 
