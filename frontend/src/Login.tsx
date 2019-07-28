@@ -17,6 +17,9 @@ const Login: React.FC<{}> = () => {
 				setActive(false);
 				// Deliver key
 				setCookie('key', resp.key);
+				setError(false);
+				setWarning(false);
+				window.location.reload();
 			} else {
 				setWarning(true);
 
@@ -43,7 +46,7 @@ const Login: React.FC<{}> = () => {
 					{(warning) ? warningMsg : null}
 					{(error) ? errorMsg : null}
 					<Input size="large" type='text' value={text}
-					       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value)}/>
+					       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value) }/>
 				</Modal.Card.Body>
 				<Modal.Card.Foot>
 					<Button color="success" onClick={handleSubmit}>Enter</Button>
