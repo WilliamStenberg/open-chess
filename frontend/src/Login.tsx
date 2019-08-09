@@ -11,7 +11,6 @@ const Login: React.FC<{}> = () => {
 	const {doFetch} = useBoardByUrlService();
 
 	const handleSubmit = () => {
-		console.log(text);
 		doFetch('auth', {name: text}, (resp: StringDict) => {
 			if (resp.key) {
 				setActive(false);

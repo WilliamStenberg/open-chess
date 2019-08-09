@@ -16,7 +16,7 @@ def client_login():
         return 'No name in JSON request', 403
     name = request.json['name']
 
-    # TODO: Store user's name to associate all their requests with a certain Board/session
+    # TODO: Store user's name to associate all their requests with Board
 
     return jsonify({'key': name}), 200
 
@@ -45,4 +45,5 @@ def flask_move():
     ret_dict = {'success': True}
     motor.perform_move(move, ret_dict)
     ret_dict['suggestions'] = motor.suggest_moves()
+    print(ret_dict)
     return jsonify(ret_dict), 200

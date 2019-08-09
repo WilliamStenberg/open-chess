@@ -41,22 +41,39 @@ def perform_move(move: str, ret_dict) -> None:
     """
     global b
     ret_dict['updates'] = list()
+    ret_dict['revert'] = list()
     # TODO extend from legal move to "good move" by Polyglot or Stockfish
     board_move = chess.Move.from_uci(move)
-
+    start = move[:2]
+    end = move[2:]
     if b.is_en_passant(board_move):
         pawn_square = move[2] + str(int(move[3]) + (-1 if b.turn else 1))
-        ret_dict['updates'].append(pawn_square + '??')  # Signal this is a removal
+        ret_dict['updates'].append(pawn_square + '??')  # Remove
+        ret_dict['updates'].append(start + end)  # Affirm the requested move
+        ret_dict['revert'].append(end + start)  # Slide back the pawn
+        ret_dict['revert'].append('??' + pawn_square)  # Create
+
     elif b.is_kingside_castling(board_move):
-        print('Kingside castles')
+        ret_dict['updates'].append(start + end)
         ret_dict['updates'].append('h1f1' if b.turn else 'h8f8')
+        ret_dict['revert'].append(end + start)  # King go back
+        ret_dict['revert'].append('f1h1' if b.turn else 'f8h8')
     elif b.is_queenside_castling(board_move):
-        print('Queenside castles')
+        ret_dict['updates'].append(start + end)
         ret_dict['updates'].append('a1d1' if b.turn else 'a8d8')
+        ret_dict['revert'].append(end + start)  # King go back
+        ret_dict['revert'].append('d1a1' if b.turn else 'd8a8')
     else:
         remove = b.piece_at(board_move.to_square)
         if remove:
-            ret_dict['updates'].append(move[2:] + '??')
+            ret_dict['updates'].append(end + '??')
+            ret_dict['updates'].append(start + end)
+            ret_dict['revert'].append(end + start)
+            ret_dict['revert'].append('??' + end)
+        else:
+            # Regular move
+            ret_dict['updates'].append(start + end)
+            ret_dict['revert'].append(end + start)
     b.push(board_move)  # type: chess.Board
 
 
@@ -74,11 +91,12 @@ def suggest_moves() -> List:
         move = entry.move
         if not isinstance(move, chess.Move):
             move = move()
-        # TODO classify suggestions depending on whether the move is known/bad/favorite
-        print('{}: learn={}, weight={}'.format(move.uci(), entry.learn, entry.weight))
+        # TODO classify suggestions depending on whether the move is known/bad
+        print('{}: l={}, w={}'.format(move.uci(), entry.learn, entry.weight))
 
         popularity = entry.weight / sum_weights
         label = 'good' if popularity > 0.3 else 'bad'
 
-        suggested_moves.append({'move': move.uci(), 'opacity': popularity, 'label': label})
+        suggested_moves.append({'move': move.uci(), 'opacity': popularity,
+                                'label': label})
     return suggested_moves
