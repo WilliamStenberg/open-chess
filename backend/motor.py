@@ -9,22 +9,38 @@ import chess.engine
 import chess.polyglot
 import chess.svg
 from chess import Board
+import pymongo
+
+engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
+db = pymongo.MongoClient().chessdb
 
 b: Board = Board()
+cursor = db.moves.find_one({'fen': b.fen()})
 
-reader = chess.polyglot.open_reader('Titans.bin')
-engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
-
+def cursor_step(move_uci: str) -> bool:
+    global cursor
+    print('Stepping from:')
+    print(cursor)
+    print(f'Looking for uci {move_uci}')
+    for reply_id in cursor['replies']:
+        reply = db.moves.find_one({'_id': reply_id})
+        if reply['uci'] == move_uci:
+            cursor = reply
+            return True
+    return False
 
 def get_empty_board() -> chess.Board:
     """ Return a starting SVG board """
-    global b
+    global b, cursor
     b = chess.Board()
+    cursor = db.moves.find_one({'fen': b.fen()})
+    print('Empty board setting')
+
     return chess.svg.board(board=b)
 
 
 def is_valid_move(move: str) -> bool:
-    """ Tests move string for legality in game or as special-command """
+    """ Tests move uci string for legality in game or as special-command """
     global b
     # TODO handle special requests such as 'pop'
     if len(move) != 4 or '?' in move:
@@ -39,7 +55,7 @@ def perform_move(move: str, ret_dict) -> None:
     :param move: UCI move
     :param ret_dict: The return dictionary to populate with move-related data
     """
-    global b
+    global b, cursor
     ret_dict['updates'] = list()
     ret_dict['revert'] = list()
     # TODO extend from legal move to "good move" by Polyglot or Stockfish
@@ -75,6 +91,9 @@ def perform_move(move: str, ret_dict) -> None:
             ret_dict['updates'].append(start + end)
             ret_dict['revert'].append(end + start)
     b.push(board_move)  # type: chess.Board
+    cursor_step(board_move.uci())
+
+    
 
 
 def suggest_moves() -> List:
@@ -82,21 +101,12 @@ def suggest_moves() -> List:
     Returns all possible book responses to current position
     :return: List of move UCI strings
     """
-    global b, reader
-    games = list(reader.find_all(b))
-    print('Book moves: ')
+    global b, cursor
+    print('DBmoves: ')
     suggested_moves = list()
-    sum_weights = sum([ent.weight for ent in games])
-    for entry in games:
-        move = entry.move
-        if not isinstance(move, chess.Move):
-            move = move()
-        # TODO classify suggestions depending on whether the move is known/bad
-        print('{}: l={}, w={}'.format(move.uci(), entry.learn, entry.weight))
-
-        popularity = entry.weight / sum_weights
-        label = 'good' if popularity > 0.3 else 'bad'
-
-        suggested_moves.append({'move': move.uci(), 'opacity': popularity,
-                                'label': label})
+    finder = lambda reply_id: db.moves.find_one({'_id': reply_id})
+    moves = list(map(finder, cursor['replies']))
+    for dbmove in moves:
+        suggested_moves.append({'move': dbmove['uci'], 'opacity': 0.6,
+                                'label': 'A move'})
     return suggested_moves

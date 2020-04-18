@@ -1,3 +1,4 @@
 sqlalchemy
 python-chess
 flask
+pymongo
