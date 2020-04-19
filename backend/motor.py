@@ -10,11 +10,11 @@ import chess.polyglot
 import chess.svg
 from chess import Board
 
-from database import db
+from backend.database import db
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
 
 b: Board = Board()
-cursor = db.moves.find_one({'fen': b.fen()})
+cursor = db.boards.find_one({'_id': b.fen()})
 
 
 def board_step(move_uci: str) -> bool:
@@ -25,19 +25,19 @@ def board_step(move_uci: str) -> bool:
     print(f'Looking for uci {move_uci}')
     for reply in cursor['theory'] + cursor['moves']:
         if reply['uci'] == move_uci:
-            cursor = reply['leads_to']
+            cursor = db.boards.find_one({'_id': reply['leads_to']})
             b.push_uci(reply['uci'])
             return True
     return False
 
 
-def get_empty_board() -> chess.Board:
+def get_empty_board(is_white: bool) -> chess.Board:
     """ Return a starting SVG board """
     global b, cursor
     b = chess.Board()
-    cursor = db.moves.find_one({'fen': b.fen()})
+    cursor = db.boards.find_one({'_id': b.fen()})
     print('Empty board setting')
-    return chess.svg.board(board=b)
+    return chess.svg.board(board=b, flipped=not is_white)
 
 
 def is_valid_move(move: str) -> bool:

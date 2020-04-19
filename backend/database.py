@@ -1,3 +1,7 @@
+"""
+database.py
+Handles Mongo DB for open-chess
+"""
 import pymongo
 import chess.polyglot
 import chess.engine
@@ -72,7 +76,6 @@ def read_file(bin_file_name, uci_moves=[]):
                 rec_adder(depth+1)
             b.pop()
         insert_board(b, replies)
-
     rec_adder(0)
 
 

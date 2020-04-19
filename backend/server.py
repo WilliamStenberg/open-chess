@@ -25,11 +25,14 @@ def client_login():
 
 
 @app.route('/svg', methods=['POST'])
-def hello_world():
+def supply_svg():
     """ Returns an empty SVG board """
-    svg = motor.get_empty_board()
     if not request.is_json:
-        return '', 400
+        return 'Could not supply SVG: Expected JSON', 400
+    req_json = request.json
+    if not 'is_white' in req_json:
+        return 'Could not supply SVG: No color supplied', 400
+    svg = motor.get_empty_board(bool(req_json['is_white']))
     return jsonify({'svg': svg}), 200
 
 

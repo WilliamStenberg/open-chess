@@ -1,4 +1,4 @@
-sqlalchemy
 python-chess
 flask
+flask-cors
 pymongo

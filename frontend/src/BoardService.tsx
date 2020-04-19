@@ -40,6 +40,7 @@ export abstract class GameModel {
 	public static SQUARE_SIZE = 0;
 	public static SVG_SIZE = 0;
 	public static SVG_OFFSET = 0;
+    public static IS_WHITE = true;
 	domPiece: HTMLElement;
 	square: string;
 	color?: boolean;
@@ -166,7 +167,7 @@ export class Piece extends GameModel {
 		let transStr = this.domPiece.getAttribute('transform');
 		if (transStr) {
 			const csv = transStr.split('translate(')[1].split(')')[0];
-			if (csv && csv.split(',').length == 2) {
+			if (csv && csv.split(',').length === 2) {
 				let [x, y] = csv.split(',');
 				return {x: parseInt(x, 10), y: parseInt(y, 10)};
 			}
