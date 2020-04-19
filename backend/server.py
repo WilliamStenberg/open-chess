@@ -1,3 +1,7 @@
+"""
+server.py
+Launching a Flask server to host open-chess backen
+"""
 from flask import jsonify, request, render_template
 from backend import app, motor
 
@@ -42,7 +46,7 @@ def flask_move():
         return 'Not a valid move', 402
 
     ret_dict = {'success': True}
-    motor.perform_move(move, ret_dict)
+    motor.game_move(move, ret_dict)
     ret_dict['suggestions'] = motor.suggest_moves()
     print(ret_dict)
     return jsonify(ret_dict), 200

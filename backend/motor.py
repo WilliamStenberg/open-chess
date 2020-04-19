@@ -9,25 +9,27 @@ import chess.engine
 import chess.polyglot
 import chess.svg
 from chess import Board
-import pymongo
 
+from database import db
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
-db = pymongo.MongoClient().chessdb
 
 b: Board = Board()
 cursor = db.moves.find_one({'fen': b.fen()})
 
-def cursor_step(move_uci: str) -> bool:
-    global cursor
+
+def board_step(move_uci: str) -> bool:
+    """ Updates board and cursor to step by given UCI """
+    global b, cursor
     print('Stepping from:')
     print(cursor)
     print(f'Looking for uci {move_uci}')
-    for reply_id in cursor['replies']:
-        reply = db.moves.find_one({'_id': reply_id})
+    for reply in cursor['theory'] + cursor['moves']:
         if reply['uci'] == move_uci:
-            cursor = reply
+            cursor = reply['leads_to']
+            b.push_uci(reply['uci'])
             return True
     return False
+
 
 def get_empty_board() -> chess.Board:
     """ Return a starting SVG board """
@@ -35,7 +37,6 @@ def get_empty_board() -> chess.Board:
     b = chess.Board()
     cursor = db.moves.find_one({'fen': b.fen()})
     print('Empty board setting')
-
     return chess.svg.board(board=b)
 
 
@@ -49,11 +50,11 @@ def is_valid_move(move: str) -> bool:
     return m in b.legal_moves
 
 
-def perform_move(move: str, ret_dict) -> None:
+def game_move(move: str, ret_dict) -> None:
     """
-    Tries to perform move on the board, returns True if successful
-    :param move: UCI move
-    :param ret_dict: The return dictionary to populate with move-related data
+    Updates game state with given move.
+    Takes UCI string move and return dictionary
+    to populate with move-related data
     """
     global b, cursor
     ret_dict['updates'] = list()
@@ -90,23 +91,25 @@ def perform_move(move: str, ret_dict) -> None:
             # Regular move
             ret_dict['updates'].append(start + end)
             ret_dict['revert'].append(end + start)
-    b.push(board_move)  # type: chess.Board
-    cursor_step(board_move.uci())
-
-    
+    board_step(board_move.uci())
 
 
-def suggest_moves() -> List:
+def suggest_moves(theory=True, other_moves=True) -> List:
     """
     Returns all possible book responses to current position
-    :return: List of move UCI strings
+    Returns list of (UCI, opacity) tuples
     """
     global b, cursor
-    print('DBmoves: ')
     suggested_moves = list()
-    finder = lambda reply_id: db.moves.find_one({'_id': reply_id})
-    moves = list(map(finder, cursor['replies']))
-    for dbmove in moves:
-        suggested_moves.append({'move': dbmove['uci'], 'opacity': 0.6,
-                                'label': 'A move'})
+    if theory:
+        for move in cursor['theory']:
+            suggested_moves.append({
+                'move': move['uci'], 'opacity': 0.9,
+                'label': 'Theory move'})
+    if other_moves:
+        for move in cursor['moves']:
+            suggested_moves.append({
+                'move': move['uci'], 'opacity': 0.6,
+                'label': 'Other move'})
+
     return suggested_moves
