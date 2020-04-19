@@ -1,148 +1,111 @@
-import {GameModel, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint} from './BoardService'
+import {GameModel, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint, Board, IMoveResponse, Suggestion} from './BoardService';
 import React from 'react';
 import {arrowColor} from './Settings';
+import StepToolbar from './Toolbars';
 
 type CoordPair = [TPoint, TPoint];
 
-type Suggestion = { move: string, opacity: number, label: string };
-
-/**
- * The response from the server when passing a move
- */
-interface IMoveResponse {
-    success: boolean,
-        suggestions: Suggestion[],
-        updates: string[],
-        revert: string[]
-}
 
 interface SvgBoardProps {
     svgobj: Element | null;
 }
 
 /**
+ * From a given coordinate pair (parsed from a move),
+ * create an SVG object for an arrow having
+ */
+const constructArrow: (cp: CoordPair, opacity: number, label: string) => SVGGElement = (coordPair, opacity, label) => {
+    let doc: SVGLineElement = document.createElementNS("http://www.w3.org/2000/svg",
+        "line");
+    // Adjusting positions for center-square coordinates
+    let x1 = coordPair[0].x + GameModel.SVG_SIZE / 2;
+    let x2 = coordPair[1].x + GameModel.SVG_SIZE / 2;
+    let y1 = coordPair[0].y + GameModel.SVG_SIZE / 2;
+    let y2 = coordPair[1].y + GameModel.SVG_SIZE / 2;
+
+    doc.setAttribute("x1", "" + x1);
+    doc.setAttribute("y1", "" + y1);
+    doc.setAttribute("x2", "" + x2);
+    doc.setAttribute("y2", "" + y2);
+    doc.setAttribute("stroke", arrowColor);
+    doc.setAttribute("stroke-width", "7");
+    doc.setAttribute("marker-end", "url(#arrowhead)");
+    doc.setAttribute("opacity", "" + opacity);
+    doc.addEventListener("mouseenter", () => {
+        doc.setAttribute('opacity', "" + Math.min(opacity + 0.2, 1));
+    }, false);
+    doc.addEventListener("mouseleave", () => {
+        doc.setAttribute('opacity', "" + opacity);
+    }, false);
+
+    // Wrapping in a g tag for opacity to take effect on the line marker (arrow head)
+    let g: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg",
+        'g');
+    g.setAttribute('opacity', "" + opacity);
+    g.appendChild(doc);
+    return g;
+};
+
+/**
+ * Clears all arrows on board and feeds fetched suggested move list
+ * to constructArrow.
+ */
+const updateSvgArrows = (board: Board, suggestions: Suggestion[]) => {
+    if (board.svg) {
+        let toBeRemoved: Node[] = [];
+        // Select first piece, to insert before it
+        let firstPiece = ((svg) => {
+            let found = null;
+            for (let [, tag] of svg.childNodes.entries()) {
+                if (!found && tag.nodeName === 'use') {
+                    found = tag;
+                } else if (tag.nodeName === 'g') {
+                    // Remove 'g' elements containing arrows
+                    toBeRemoved = toBeRemoved.concat(tag);
+                }
+
+            }
+            return found;
+        })(board.svg);
+        toBeRemoved.forEach(item => board.svg && board.svg.removeChild(item));
+        suggestions.forEach((item: Suggestion) => {
+            let start = item.move.slice(0, 2), end = item.move.slice(2, 4);
+            let from_square = board.squares.find(p => p.squareName() === start);
+            let to_square = board.squares.find(p => p.squareName() === end);
+            if (from_square && to_square) {
+                let threshOpacity = Math.max(0.2, Math.min(0.8, item.opacity + 0.1));
+                let arrowForm = constructArrow([from_square.getPosition(), to_square.getPosition()],
+                    threshOpacity, item.label);
+                board.svg && board.svg.insertBefore(arrowForm, firstPiece);
+            }
+        });
+    } else {
+        console.error('update arrows when no svg?')
+    }
+};
+
+/**
  * The view of the chess board, containing SvgBoard for rendering SVG board,
  * mouse dragging functions, and loading a new setup onto the board through loadBoard.
  */
 const BoardViewer: React.FC<{}> = () => {
-    const {service, board, doFetch} = useBoardByUrlService();
-
-    /**
-     * From a given coordinate pair (parsed from a move),
-     * create an SVG object for an arrow having
-     */
-    const constructArrow: (cp: CoordPair, opacity: number, label: string) => SVGGElement = (coordPair, opacity, label) => {
-        let doc: SVGLineElement = document.createElementNS("http://www.w3.org/2000/svg",
-            "line");
-        // Adjusting positions for center-square coordinates
-        let x1 = coordPair[0].x + GameModel.SVG_SIZE / 2;
-        let x2 = coordPair[1].x + GameModel.SVG_SIZE / 2;
-        let y1 = coordPair[0].y + GameModel.SVG_SIZE / 2;
-        let y2 = coordPair[1].y + GameModel.SVG_SIZE / 2;
-
-        doc.setAttribute("x1", "" + x1);
-        doc.setAttribute("y1", "" + y1);
-        doc.setAttribute("x2", "" + x2);
-        doc.setAttribute("y2", "" + y2);
-        doc.setAttribute("stroke", arrowColor);
-        doc.setAttribute("stroke-width", "7");
-        doc.setAttribute("marker-end", "url(#arrowhead)");
-        doc.setAttribute("opacity", "" + opacity);
-        doc.addEventListener("mouseenter", () => {
-            doc.setAttribute('opacity', "" + Math.min(opacity + 0.2, 1));
-        }, false);
-        doc.addEventListener("mouseleave", () => {
-            doc.setAttribute('opacity', "" + opacity);
-        }, false);
-
-        // Wrapping in a g tag for opacity to take effect on the line marker (arrow head)
-        let g: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg",
-            'g');
-        g.setAttribute('opacity', "" + opacity);
-        g.appendChild(doc);
-        return g;
-
-    };
-
-    /**
-     * Clears all arrows on board and feeds fetched suggested move list
-     * to constructArrow.
-     */
-    const updateSvgArrows = (resp: IMoveResponse) => {
-        if (board.svg) {
-            let toBeRemoved: Node[] = [];
-            // Select first piece, to insert before it
-            let firstPiece = ((svg) => {
-                let found = null;
-                for (let [, tag] of svg.childNodes.entries()) {
-                    if (!found && tag.nodeName === 'use') {
-                        found = tag;
-                    } else if (tag.nodeName === 'g') {
-                        // Remove 'g' elements containing arrows
-                        toBeRemoved = toBeRemoved.concat(tag);
-                    }
-
-                }
-                return found;
-            })(board.svg);
-            toBeRemoved.forEach(item => board.svg && board.svg.removeChild(item));
-            resp.suggestions.forEach((item: Suggestion) => {
-                let start = item.move.slice(0, 2), end = item.move.slice(2, 4);
-                let from_square = board.squares.find(p => p.squareName() === start);
-                let to_square = board.squares.find(p => p.squareName() === end);
-                if (from_square && to_square) {
-                    let threshOpacity = Math.max(0.2, Math.min(0.8, item.opacity + 0.1));
-                    let arrowForm = constructArrow([from_square.getPosition(), to_square.getPosition()],
-                        threshOpacity, item.label);
-                    board.svg && board.svg.insertBefore(arrowForm, firstPiece);
-                }
-            });
-        } else {
-            console.error('update arrows when no svg?')
-        }
-    };
-
-    const executeFetchUpdates = (commands: string[]) => {
-        // TODO: Could be optimized by a single loop over board pieces?
-        commands.forEach((move) => {
-            let start = move.slice(0, 2), end = move.slice(2, 4);
-            if (start === '??') {
-                // Fetch the object from the remove queue
-                let piece = board.pieces.find(p => p.isOnBoard() && p.squareName() === end);
-                let square = board.squares.find(p => p.square === end);
-                if (piece && square) {
-                    piece.placeOn(square);
-                } else {
-                    console.error('Could not resurrect piece');
-                }
-            } else if (end === '??') {
-                let p = board.pieces.find(p => p.isOnBoard() && p.squareName() === start);
-                if (p) {
-                    p.remove();
-                } else {
-                    console.error('malformed command?', move);
-                }
-            } else { // Moving pieces
-                let piece = board.pieces.find(p => p.isOnBoard() && p.squareName() === start);
-                let targetSquare = board.squares.find(p => p.squareName() === end);
-                piece && targetSquare && piece.placeOn(targetSquare);
-            }
-        })
-    };
+    const {service, board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
 
     const handleFetchMoveResponse = (squareUpped: string, resp: IMoveResponse) => {
-        executeFetchUpdates(resp.updates);
-        console.log(resp.updates);
         // TODO call arrows with suggestions
-        board.removeStack.push(resp.revert);
-        updateSvgArrows(resp);
+        setBoard(((b: Board)=> {
+            executeFetchUpdates(b, resp.updates);
+            b.backStack.push(resp);
+            b.forwardStack = [];
+            updateSvgArrows(b, resp.suggestions);
+            return b;
+        })(board));
 
     };
 
     const onPieceMouseDown: { (pc: Piece, evt: Event): void } = (pc, _) => {
         GameModel.drag = {piece: pc, start: pc.occupying};
     };
-
 
     /**
      * SVG transformations when dragging a piece on the board
@@ -272,9 +235,12 @@ const BoardViewer: React.FC<{}> = () => {
                 pieces.forEach((item) => {
                     newSvg.appendChild(item.domPiece);
                 });
-                board.svg = newSvg;
-                board.pieces = pieces;
-                board.squares = squares;
+                setBoard(((board: Board)  => {
+                    board.svg = newSvg;
+                    board.pieces = pieces;
+                    board.squares = squares;
+                    return board;
+                })(board));
             }
         })
 
@@ -353,19 +319,21 @@ const BoardViewer: React.FC<{}> = () => {
 
     return (
         <div>
+        <StepToolbar/>
             <SvgBoard svgobj={board.svg}/>
             {(service.status === 'loading' || service.status === 'init') &&
                 <div>Loading</div>
             }
-                {service.status === 'loaded' && (
-                    <div>Loaded</div>
-                )}
-                    {service.status === 'error' && (
-                        <div>Yikes! </div>
-                    )}
+        {service.status === 'loaded' && (
+            <div>Loaded</div>
+        )}
+        {service.status === 'error' && (
+            <div>Yikes! </div>
+        )}
 
-                    </div>
+    </div>
     );
 };
 
+export { updateSvgArrows };
 export default BoardViewer;

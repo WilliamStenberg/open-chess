@@ -13,6 +13,7 @@
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-scripts": "^3.4.1",
+    "reactn": "^2.2.7",
     "typescript": "3.4.5"
   },
   "scripts": {

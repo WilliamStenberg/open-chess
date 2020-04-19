@@ -1,3 +1,4 @@
+import {useGlobal} from 'reactn';
 import {useState} from 'react';
 import {url} from './Settings';
 
@@ -19,6 +20,19 @@ export class TPoint {
 	toString() {
 		return "" + this.x + ',' + this.y
 	}
+}
+
+export type Suggestion = { move: string, opacity: number, label: string };
+
+/**
+ * The response from the server when passing a move
+ */
+export interface IMoveResponse {
+    success: boolean;
+    move: string;
+    suggestions: Suggestion[];
+    updates: string[];
+    revert: string[];
 }
 
 export function svgPoint(element: SVGSVGElement, pt: TPoint): TPoint {
@@ -68,7 +82,6 @@ export abstract class GameModel {
 	public abstract getPosition(): TPoint;
 }
 
-
 export class Square extends GameModel {
 	constructor(domPiece: HTMLElement, square: string) {
 		super(domPiece, square);
@@ -87,8 +100,6 @@ export class Square extends GameModel {
 				mouseMove(this, evt)
 			};
 		}
-
-
 	}
 
 	public getPosition(): TPoint {
@@ -182,7 +193,8 @@ export interface Board {
 	svgPoint: any;
 	pieces: Piece[];
 	squares: Square[];
-	removeStack: string[][];
+	backStack: IMoveResponse[];
+	forwardStack: IMoveResponse[];
 }
 
 interface ServiceInit {
@@ -213,55 +225,83 @@ type Service<T> =
 export type StringDict = { [key: string]: any }
 
 
+const executeFetchUpdates = (board: Board, commands: string[]) => {
+    // TODO: Could be optimized by a single loop over board pieces?
+    commands.forEach((move) => {
+        let start = move.slice(0, 2), end = move.slice(2, 4);
+        if (start === '??') {
+            // Fetch the object from the remove queue
+            let piece = board.pieces.find((p: Piece) => !p.isOnBoard() && p.squareName() === end);
+            let square = board.squares.find((p: Piece) => p.square === end);
+
+            if (piece && square) {
+                piece.placeOn(square);
+            } else {
+                console.error('Could not resurrect piece');
+            }
+        } else if (end === '??') {
+            let p = board.pieces.find((p: Piece) => p.isOnBoard() && p.squareName() === start);
+            if (p) {
+                p.remove();
+            } else {
+                console.error('malformed command?', move);
+            }
+        } else { // Moving pieces
+            let piece = board.pieces.find((p: Piece) => p.isOnBoard() && p.squareName() === start);
+            let targetSquare = board.squares.find((p: Piece) => p.squareName() === end);
+
+            piece && targetSquare && piece.placeOn(targetSquare);
+        }
+    })
+};
+
+
+
 /**
  * Represents the calling to backend
  * */
 const useBoardByUrlService = () => {
-	// Result here refers to a board fetch request
-	const [service, setService] = useState<Service<string>>({
-		status: 'init'
-	});
+    // Result here refers to a board fetch request
+    const [service, setService] = useState<Service<string>>({status: 'init'});
 
 
-	/**
-	 * Helper function to perform a fetch call to backend with given dictionary.
-	 * Must supply endpoint, request dict and resolve function,
-	 * reject function is optional but will always setService to error.
-	 */
-	const doFetch = (endpoint: string, requestDict: { [key: string]: any },
-	                 resolve: (response: StringDict) => void,
-	                 reject?: (response: StringDict) => void) => {
-		const reject_func = (reject) ? reject : () => {
-		};
-		fetch(url + '/' + endpoint, {
-			method: "POST",
-			headers: {
-				Accept: "application/json",
-				"Content-Type": "application/json"
-			},
-			body: JSON.stringify(requestDict)
-		})
-			.then(response => response.json())
-			.then(response => {
-				resolve(response);
-				setService({status: 'loaded', payload: response})
-			})
-			.catch(error => {
-				setService({status: 'error', error});
-				console.error('Fetch error on ' + endpoint + ', us sending:');
-				console.log(requestDict);
-				console.log(error);
-				reject_func(error);
-			})
 
-	};
+    /**
+     * Helper function to perform a fetch call to backend with given dictionary.
+     * Must supply endpoint, request dict and resolve function,
+     * reject function is optional but will always setService to error.
+     */
+    const doFetch = (endpoint: string, requestDict: { [key: string]: any },
+        resolve: (response: StringDict) => void,
+        reject?: (response: StringDict) => void) => {
+            const reject_func = (reject) ? reject : () => {
+            };
+            fetch(url + '/' + endpoint, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(requestDict)
+            })
+                .then(response => response.json())
+                .then(response => {
+                    resolve(response);
+                    setService({status: 'loaded', payload: response})
+                })
+                .catch(error => {
+                    setService({status: 'error', error});
+                    console.error('Fetch error on ' + endpoint + ', us sending:');
+                    console.log(requestDict);
+                    console.log(error);
+                    reject_func(error);
+                })
 
-	const initialBoardState: Board = {
-		svg: null, svgPoint: null,
-		pieces: [], squares: [], removeStack: []
-	};
-	const [board, setBoard] = useState<Board>(initialBoardState);
-	return {service, board, setBoard, doFetch};
+        };
+
+    const [board, setBoard] = useGlobal('board');
+
+    return {service, board, setBoard, doFetch, executeFetchUpdates};
 };
 
 export {useBoardByUrlService};

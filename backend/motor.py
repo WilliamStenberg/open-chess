@@ -63,6 +63,7 @@ def game_move(move: str, ret_dict) -> None:
     board_move = chess.Move.from_uci(move)
     start = move[:2]
     end = move[2:]
+    ret_dict['move'] = move
     if b.is_en_passant(board_move):
         pawn_square = move[2] + str(int(move[3]) + (-1 if b.turn else 1))
         ret_dict['updates'].append(pawn_square + '??')  # Remove
@@ -113,3 +114,19 @@ def suggest_moves(theory=True, other_moves=True) -> List:
                 'label': 'Other move'})
 
     return suggested_moves
+
+
+def can_step_back() -> bool:
+    """ Return bool on if there is a move in the move_stack """
+    global b
+    try:
+        b.peek()
+    except IndexError:
+        return False
+    return True
+
+
+def step_back():
+    global b, cursor
+    b.pop()
+    cursor = db.boards.find_one({'_id': b.fen()})

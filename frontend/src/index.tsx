@@ -1,9 +1,15 @@
 import React from 'react';
+import {setGlobal} from 'reactn';
 import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 import * as serviceWorker from './serviceWorker';
 
+setGlobal({
+    board: {
+		svg: null, svgPoint: null,
+		pieces: [], squares: [], backStack: [], forwardStack: []
+	}});
 ReactDOM.render(<App/>, document.getElementById('root'));
 
 // If you want your app to work offline and load faster, you can change
