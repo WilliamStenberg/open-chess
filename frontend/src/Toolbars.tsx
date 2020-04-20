@@ -8,8 +8,6 @@ import { updateSvgArrows } from './BoardSvg'
 const StepToolbar: React.FC<{}> = () => {
     const {board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
     const stepBack = () => {
-
-        
         doFetch('back', {}, (resp: IMoveResponse) => {
             if (board.backStack.length) {
                 setBoard(((b: Board) => {
@@ -27,7 +25,7 @@ const StepToolbar: React.FC<{}> = () => {
                 })(board));
 
             } else {
-                console.log('Server says we can back, but backStakc is empty');
+                console.log('backStack is empty');
             }
         }, () => {
             // This fail means no backing possible
@@ -58,8 +56,9 @@ const StepToolbar: React.FC<{}> = () => {
 
     return (
         <div>
-            <button onClick={stepBack}>Back</button>
-            <button onClick={stepForward}>Forward</button>
+            <button id='backButton' onClick={stepBack}>Back</button>
+
+            <button id='forwardButton' onClick={stepForward}>Forward</button>
         </div>
     );
 };
