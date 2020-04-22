@@ -98,19 +98,19 @@ def game_move(move: str, ret_dict) -> None:
 def suggest_moves(theory=True, other_moves=True) -> List:
     """
     Returns all possible book responses to current position
-    Returns list of (UCI, opacity) tuples
+    Returns list of (UCI, score) tuples
     """
     global b, cursor
     suggested_moves = list()
     if theory:
         for move in cursor['theory']:
             suggested_moves.append({
-                'move': move['uci'], 'opacity': 0.9,
+                'move': move['uci'], 'score': move['score_diff'],
                 'label': 'Theory move'})
     if other_moves:
         for move in cursor['moves']:
             suggested_moves.append({
-                'move': move['uci'], 'opacity': 0.6,
+                'move': move['uci'], 'score': move['score_diff'],
                 'label': 'Other move'})
 
     return suggested_moves

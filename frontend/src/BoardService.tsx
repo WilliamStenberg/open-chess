@@ -22,7 +22,7 @@ export class TPoint {
 	}
 }
 
-export type Suggestion = { move: string, opacity: number, label: string };
+export type Suggestion = { move: string, score: number, label: string };
 
 /**
  * The response from the server when passing a move
@@ -34,6 +34,7 @@ export interface IMoveResponse {
     updates: string[];
     revert: string[];
 }
+
 
 export function svgPoint(element: SVGSVGElement, pt: TPoint): TPoint {
 	if (element) {

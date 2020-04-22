@@ -1,6 +1,5 @@
 import {GameModel, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint, Board, IMoveResponse, Suggestion} from './BoardService';
 import React from 'react';
-import {arrowColor} from './Settings';
 import StepToolbar from './Toolbars';
 
 type CoordPair = [TPoint, TPoint];
@@ -10,11 +9,29 @@ interface SvgBoardProps {
     svgobj: Element | null;
 }
 
+const decideArrowColor = (score: number, label: string): string => {
+    if (label.toLowerCase().includes('theory')) {
+        // Always blue for theory
+        return '#0a9e8a';
+    }
+    if (score < -100)
+        return '#ff0000'; // Blunder = red
+    if (score < -30)
+        return '#fd190d'; // Lightly red for a mistake
+    if (score < 0)
+        return '#fd7e0d'; // Orange for inaccuracy
+    if (score < 30)
+        return '#ccc'; // Grey/meh
+    if (score < 100)
+        return '#33ca45'; // Light green for a good move
+    return '#0ac421'; // Nice bright green for really good moves
+}
+
 /**
  * From a given coordinate pair (parsed from a move),
  * create an SVG object for an arrow having
  */
-const constructArrow: (cp: CoordPair, opacity: number, label: string) => SVGGElement = (coordPair, opacity, label) => {
+const constructArrow: (cp: CoordPair, score: number, label: string) => SVGGElement = (coordPair, score, label) => {
     let doc: SVGLineElement = document.createElementNS("http://www.w3.org/2000/svg",
         "line");
     // Adjusting positions for center-square coordinates
@@ -27,15 +44,28 @@ const constructArrow: (cp: CoordPair, opacity: number, label: string) => SVGGEle
     doc.setAttribute("y1", "" + y1);
     doc.setAttribute("x2", "" + x2);
     doc.setAttribute("y2", "" + y2);
+
+    let arrowColor = decideArrowColor(score, label);
+    let opacity = 0.8;
+
     doc.setAttribute("stroke", arrowColor);
     doc.setAttribute("stroke-width", "7");
     doc.setAttribute("marker-end", "url(#arrowhead)");
     doc.setAttribute("opacity", "" + opacity);
     doc.addEventListener("mouseenter", () => {
         doc.setAttribute('opacity', "" + Math.min(opacity + 0.2, 1));
+        if (! doc.childNodes.length) {
+            let title: SVGElement = document.createElementNS("http://www.w3.org/2000/svg", 'title');
+            let txt = document.createTextNode("a"+score);
+            title.appendChild(txt);
+            doc.appendChild(title);
+        }
     }, false);
     doc.addEventListener("mouseleave", () => {
         doc.setAttribute('opacity', "" + opacity);
+        if (doc.childNodes.length) {
+            doc.removeChild(doc.childNodes[0]);
+        }
     }, false);
 
     // Wrapping in a g tag for opacity to take effect on the line marker (arrow head)
@@ -68,14 +98,14 @@ const updateSvgArrows = (board: Board, suggestions: Suggestion[]) => {
             return found;
         })(board.svg);
         toBeRemoved.forEach(item => board.svg && board.svg.removeChild(item));
+        console.log(suggestions);
         suggestions.forEach((item: Suggestion) => {
             let start = item.move.slice(0, 2), end = item.move.slice(2, 4);
             let from_square = board.squares.find(p => p.squareName() === start);
             let to_square = board.squares.find(p => p.squareName() === end);
             if (from_square && to_square) {
-                let threshOpacity = Math.max(0.2, Math.min(0.8, item.opacity + 0.1));
                 let arrowForm = constructArrow([from_square.getPosition(), to_square.getPosition()],
-                    threshOpacity, item.label);
+                    item.score, item.label);
                 board.svg && board.svg.insertBefore(arrowForm, firstPiece);
             }
         });
@@ -166,7 +196,7 @@ const BoardViewer: React.FC<{}> = () => {
         arrowForm.setAttribute('refX', '1.5');
         arrowForm.setAttribute('refY', '2');
         arrowForm.setAttribute('orient', 'auto');
-        arrowForm.setAttribute('fill', arrowColor);
+        arrowForm.setAttribute('fill', "#000");
 
         let poly = document.createElementNS('http://www.w3.org/2000/svg',
             'polygon');
