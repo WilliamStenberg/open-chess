@@ -3,30 +3,41 @@ database.py
 Handles Mongo DB for open-chess
 """
 import chess.engine
-from typing import List, Dict
-import pymongo
+import chess.pgn
 import chess.polyglot
+from chess.pgn import Game
+from typing import Dict
+import pymongo
+import bson
 
 conn = pymongo.MongoClient()
 db = conn.chessdb
 
-MAX_DEPTH = 15
+MAX_DEPTH = 25
 
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
 
 
-def insert_board(b: chess.Board, theory=[], other_moves=[], game=None) -> bool:
-    found = db.boards.find_one({'_id': b.fen()})
+def insert_board(board_fen: str, theory=None, other_moves=None,
+                 game=None, score=None) -> bool:
+    """ Insert with updating, eventually moving from moves to theory """
+    if not theory:
+        theory = []
+    if not other_moves:
+        other_moves = []
+    found = db.boards.find_one({'_id': board_fen})
     if found:
-        existing_theory_ucis = map(lambda x: x['uci'], found['theory'])
-        existing_move_ucis = map(lambda x: ['uci'], found['moves'])
+        existing_theory_ucis = list(map(lambda x: x['uci'], found['theory']))
+        existing_move_ucis = list(map(lambda x: x['uci'], found['moves']))
         for elem in theory:
             if elem['uci'] in existing_theory_ucis:
                 continue
             if elem['uci'] in existing_move_ucis:
+                existing = [m for m in found['moves']
+                            if m['uci'] == elem['uci']][0]
                 found['moves'] = [m for m in found['moves']
                                   if m['uci'] != elem['uci']]
-                found['theory'].append(elem)
+                found['theory'].append(existing)
 
         for elem in other_moves:
             if elem['uci'] in existing_theory_ucis or \
@@ -37,13 +48,13 @@ def insert_board(b: chess.Board, theory=[], other_moves=[], game=None) -> bool:
             found['games'].append(game)
         return bool(db.boards.save(found))
 
-    db_board = {'_id': b.fen(), 'score': None,
+    db_board = {'_id': board_fen, 'score': score,
                 'theory': theory, 'moves': other_moves,
                 'games': [game] if game else []}
     return bool(db.boards.insert_one(db_board))
 
 
-def read_file(bin_file_name, uci_moves=[]):
+def read_polyglot_file(bin_file_name, uci_moves=None):
     """
     Read a Polyglot-compatible game file, starting with a set
     of given move UCI:s.
@@ -51,6 +62,9 @@ def read_file(bin_file_name, uci_moves=[]):
     """
     reader = chess.polyglot.open_reader(bin_file_name)
     b = chess.Board()
+
+    if not uci_moves:
+        uci_moves = []
 
     def rec_adder(depth):
         if depth > MAX_DEPTH:
@@ -62,23 +76,88 @@ def read_file(bin_file_name, uci_moves=[]):
                 continue
             san = b.san(move)
             b.push(move)
-            found = db.boards.find_one({'_id': b.fen()})
-            if depth < len(uci_moves) or not found:
-                db_move = {
-                    'leads_to': b.fen(),
-                    'uci': move.uci(),
-                    'san': san,
-                    'score_diff': None
-                    }
-                replies.append(db_move)
+            db_move = {
+                'leads_to': b.fen(),
+                'uci': move.uci(),
+                'san': san,
+                'score_diff': None
+                }
+            replies.append(db_move)
 
-                rec_adder(depth+1)
+            rec_adder(depth+1)
             b.pop()
-        insert_board(b, replies)
+        insert_board(b.fen(), replies)
     rec_adder(0)
 
 
-def set_position_score(fen, score: int):
+def parse_pgn_game(pgn: Game):
+    """ Parse a PGN game object and add it and its moves to DB """
+    print('Parsing PGN game...')
+    game_id = bson.ObjectId()
+
+    def is_int(var: str) -> bool:
+        """ Converter for ELO strings """
+        try:
+            int(var)
+        except ValueError:
+            return False
+        return True
+    db_game = {
+        '_id': game_id,
+        'date': pgn.headers['Date'] if 'Date' in pgn.headers else '???',
+        'white': pgn.headers['White'] if 'White' in pgn.headers else '???',
+        'white_elo': int(pgn.headers['WhiteElo']) if (
+            'WhiteElo' in pgn.headers
+            and is_int(pgn.headers['WhiteElo'])) else 0,
+        'black': pgn.headers['Black'] if 'Black' in pgn.headers else '???',
+        'black_elo': int(pgn.headers['BlackElo']) if (
+            'BlackElo' in pgn.headers
+            and is_int(pgn.headers['BlackElo'])) else 0,
+        'result': pgn.headers['Result'] if 'Result' in pgn.headers else '???'
+        }
+    if db.games.find_one({k: v for k, v in db_game.items() if k != '_id'}):
+        print('SKIPPED!')
+        return
+    print('Inserting:', db_game)
+    db.games.insert_one(db_game)
+    white_theory = db_game['white_elo'] >= 2500
+    black_theory = db_game['black_elo'] >= 2500
+    turn = True
+    b = chess.Board()
+    for i, move in enumerate(pgn.mainline_moves()):
+        san = b.san(move)
+        b.push(move)
+        db_move = {
+            'leads_to': b.fen(),
+            'uci': move.uci(),
+            'san': san,
+            'score_diff': None
+            }
+        b.pop()  # ugly, but we need the original position
+        if (turn and white_theory) or (not turn and black_theory):
+            insert_board(b.fen(), [db_move], [], game_id if i > 5 else None)
+        else:
+            insert_board(b.fen(), [], [db_move], game_id if i > 5 else None)
+        b.push(move)  # so now we put it back
+        turn = not turn
+        if i > MAX_DEPTH:
+            break
+
+
+def read_pgn_file(pgn_file_name, limit=0):
+    """ Loop through all PGN games in a PGN file, call parser """
+    with open(pgn_file_name) as f:
+        pgn = chess.pgn.read_game(f)
+        count = 0
+        while pgn:
+            parse_pgn_game(pgn)
+            pgn = chess.pgn.read_game(f)
+            count += 1
+            if count >= limit and limit != 0:
+                break
+
+
+def set_position_score(fen: str, score: int):
     """ Update a position both locally and in DB """
     db.boards.update_one(
         {'_id': fen},
@@ -93,35 +172,145 @@ def set_position_moves_scores(cursor, uci_score_dict: Dict):
     which requires the moves' array indices.
     """
     set_instructions = {}  # $set key-value pairs, with indices
+    used_ucis = []  # used to know which to push entries for
     for i, theory_move in enumerate(cursor['theory']):
         if theory_move['uci'] in uci_score_dict.keys():
             diff = uci_score_dict[theory_move['uci']] - cursor['score']
             set_instructions[f'theory.{i}.score_diff'] = diff
-
-            set_position_score(
-                theory_move['leads_to'], -uci_score_dict[theory_move['uci']])
+            future = db.boards.find_one({'_id': theory_move['leads_to']})
+            score = -uci_score_dict[theory_move['uci']]
+            if future:
+                set_position_score(theory_move['leads_to'], score)
+            else:
+                insert_board(theory_move['leads_to'], score=score)
+            used_ucis.append(theory_move['uci'])
 
     for i, move in enumerate(cursor['moves']):
         if move['uci'] in uci_score_dict.keys():
             diff = uci_score_dict[move['uci']] - cursor['score']
             set_instructions[f'moves.{i}.score_diff'] = diff
-            set_position_score(
-                move['leads_to'], -uci_score_dict[move['uci']])
-    db.boards.update_one({'_id': cursor['_id']},
-                         {'$set': set_instructions})
+            future = db.boards.find_one({'_id': move['leads_to']})
+            score = -uci_score_dict[move['uci']]
+            if future:
+                set_position_score(move['leads_to'], score)
+            else:
+                insert_board(move['leads_to'], score=score)
+            used_ucis.append(move['uci'])
+
+    if set_instructions:
+        db.boards.update_one({'_id': cursor['_id']},
+                             {'$set': set_instructions})
+    if len(used_ucis) < len(uci_score_dict):
+        new_moves = []
+        temp_board = chess.Board(cursor['_id'])
+        for uci, score in uci_score_dict.items():
+            if uci in used_ucis:
+                continue
+            san = temp_board.san(chess.Move.from_uci(uci))
+            temp_board.push_uci(uci)
+
+            diff = score - cursor['score']
+            db_move = {
+                'leads_to': temp_board.fen(),
+                'uci': uci,
+                'san': san,
+                'score_diff': diff
+                }
+            new_moves.append(db_move)
+            # empty fields for both theory and moves
+            insert_board(temp_board.fen(), score=-score)
+            temp_board.pop()
+
+        db.boards.update_one({'_id': cursor['_id']},
+                             {'$push': {'moves': {'$each': new_moves}}})
 
 
+def crawl_troubleshoot_scoring(adjust=False):
+    """ Will report on inconsistencies, might correct obvious errors """
+    b = chess.Board()
+    cursor = db.boards.find_one({'_id': b.fen()})
 
-def crawl_evaluate(uci_moves=[]):
-    global cursor
+    def rec_crawler():
+        """ Walks and looks for oddities """
+        nonlocal cursor
+        if not cursor:
+            return
+        if cursor['score'] is None:
+            return
+        for move in cursor['theory'] + cursor['moves']:
+            if move['score_diff'] is not None:
+                future = db.boards.find_one({'_id': move['leads_to']})
+                if future:
+                    if future['score'] is None:
+                        if not adjust:
+                            print('Found a board lacking score')
+                            print(cursor)
+                            print('and problem is below:')
+                            print(future)
+                        if adjust and cursor['score'] is not None:
+                            print('Fixing a board lacking score!')
+                            fix_score = -(cursor['score'] + move['score_diff'])
+                            db.boards.update_one(
+                                {'_id': future['_id']},
+                                {'$set': {'score': fix_score}})
+            safe = cursor.copy()
+            cursor = db.boards.find_one({'_id': move['leads_to']})
+            rec_crawler()
+            cursor = safe
+    rec_crawler()
+
+
+def analyse_position(eval_cursor, eval_board, root_moves=None):
+    """ Commit analysis to DB """
+    if root_moves:
+        time_limit = chess.engine.Limit(
+            time=min(5, max(2, len(root_moves))))
+        lines = engine.analyse(
+            eval_board, time_limit,
+            root_moves=root_moves,
+            multipv=len(root_moves))
+    else:
+        time_limit = chess.engine.Limit(time=2)
+        lines = engine.analyse(
+            eval_board, time_limit,
+            multipv=3)
+
+    uci_score_dict = {
+        line['pv'][0].uci(): line['score'].relative.score(
+            mate_score=100000)
+        for line in lines}
+    print(uci_score_dict)
+    if any([v is None for v in uci_score_dict.values()]):
+        print('Somehow, some score is None')
+        print(uci_score_dict)
+        print(lines)
+    if eval_cursor['score'] is None:
+        print('will crash now')
+        print(eval_cursor)
+        print(eval_board.move_stack)
+    set_position_moves_scores(eval_cursor, uci_score_dict)
+
+
+def crawl_evaluate(uci_moves=None):
+    """ Recursive evaluator """
+    global engine
+    try:
+        engine.options
+    except chess.engine.EngineTerminatedError:
+        print('Restarting engine')
+        engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
+
     b = chess.Board()
     cursor = db.boards.find_one({'_id': b.fen()})
     set_position_score(cursor['_id'], 0)
     cursor = db.boards.find_one({'_id': b.fen()})
 
+    if not uci_moves:
+        uci_moves = []
+
     def rec_crawler(depth):
         """ Recursive evaluating function """
-        global cursor
+        nonlocal cursor
         if not cursor:
             # Done!
             return
@@ -132,18 +321,9 @@ def crawl_evaluate(uci_moves=[]):
                             if tm['uci'] == uci_moves[depth]]
         # Those that shall be analysed
         root_moves = [chess.Move.from_uci(tm['uci'])
-                      for tm in target_moves if not tm['score_diff']]
+                      for tm in target_moves if tm['score_diff'] is None]
         if root_moves:
-            time_limit = chess.engine.Limit(
-                time=min(5, max(2, len(root_moves))))
-            lines = engine.analyse(
-                b, time_limit,
-                root_moves=root_moves,
-                multipv=len(root_moves))
-            uci_score_dict = {
-                line['pv'][0].uci(): line['score'].relative.score()
-                for line in lines}
-            set_position_moves_scores(cursor, uci_score_dict)
+            analyse_position(cursor, b, root_moves)
 
         for move_obj in target_moves:
             b.push_uci(move_obj['uci'])
@@ -154,13 +334,15 @@ def crawl_evaluate(uci_moves=[]):
 
     rec_crawler(0)
 
+
 def populate_db():
+    """ Quickhand way to import Polyglot from Titans file """
     print('Importing Spanish')
-    read_file('../Titans.bin', [
+    read_polyglot_file('../Titans.bin', [
         'e2e4', 'e7e5',
         'g1f3', 'b8c6',
         'f1b5'])
-    #print('Importing Caro-Kann')
-    #read_file('../Titans.bin', [
-    #    'e2e4', 'c7c6'])
 
+    print('Importing Caro-Kann')
+    read_polyglot_file('../Titans.bin', [
+        'e2e4', 'c7c6'])

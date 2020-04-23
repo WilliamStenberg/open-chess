@@ -6,7 +6,6 @@ const keyMap = {
 
 const keyHandlers = {
     BACK: (_?: KeyboardEvent) => {
-        console.log('back'); 
         let btn = document.getElementById('backButton');
         btn && btn.click();
 

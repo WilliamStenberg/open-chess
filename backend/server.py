@@ -16,7 +16,7 @@ def root():
 def client_login():
     """ Name handling from new client setting cookies """
     if not request.is_json or 'name' not in request.json:
-        return jsonify('No name in JSON request'), 403
+        return jsonify({'err': 'No name in JSON request'}), 403
     name = request.json['name']
 
     # TODO: Store user's name to associate all their requests with Board
@@ -28,10 +28,10 @@ def client_login():
 def supply_svg():
     """ Returns an empty SVG board """
     if not request.is_json:
-        return jsonify('Could not supply SVG: Expected JSON'), 400
+        return jsonify({'err': 'Could not supply SVG: Expected JSON'}), 400
     req_json = request.json
     if not 'is_white' in req_json:
-        return jsonify('Could not supply SVG: No color supplied'), 400
+        return jsonify({'err': 'Could not supply SVG: No color supplied'}), 400
     svg = motor.get_empty_board(bool(req_json['is_white']))
     return jsonify({'svg': svg}), 200
 
@@ -40,10 +40,10 @@ def supply_svg():
 def flask_move():
     """ Tries to perform JSON dict['move'] as UCI move on the board"""
     if not request.is_json:
-        return jsonify('Could not parse request: Expected JSON'), 400
+        return jsonify({'err': 'Could not parse request: Expected JSON'}), 400
     req_json = request.json
     if 'move' not in req_json:
-        return jsonify('Could not parse request: No move'), 400
+        return jsonify({'err': 'Could not parse request: No move'}), 400
     move = req_json['move']
     if not motor.is_valid_move(move):
         return jsonify({'err': 'Not a valid move'}), 402
@@ -62,7 +62,7 @@ def flask_step_back():
     because the client holds revert information
     """
     if not motor.can_step_back():
-        return jsonify('Cannot step back'), 402
+        return jsonify({'err': 'Cannot step back'}), 402
 
     motor.step_back()
     return jsonify({'success': True}), 200

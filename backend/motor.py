@@ -10,25 +10,31 @@ import chess.polyglot
 import chess.svg
 from chess import Board
 
-from backend.database import db
+from backend.database import db, analyse_position
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
 
 b: Board = Board()
 cursor = db.boards.find_one({'_id': b.fen()})
 
 
-def board_step(move_uci: str) -> bool:
+def board_step(move_uci: str):
     """ Updates board and cursor to step by given UCI """
     global b, cursor
     print('Stepping from:')
     print(cursor)
     print(f'Looking for uci {move_uci}')
+    found = False
     for reply in cursor['theory'] + cursor['moves']:
         if reply['uci'] == move_uci:
             cursor = db.boards.find_one({'_id': reply['leads_to']})
             b.push_uci(reply['uci'])
-            return True
-    return False
+            found = True
+            break
+    if not found:
+        print('Want to analyse this new move,', move_uci)
+        analyse_position(cursor, b, [chess.Move.from_uci(move_uci)])
+        b.push_uci(move_uci)
+        cursor = db.boards.find_one({'_id': b.fen()})
 
 
 def get_empty_board(is_white: bool) -> chess.Board:
@@ -46,7 +52,10 @@ def is_valid_move(move: str) -> bool:
     # TODO handle special requests such as 'pop'
     if len(move) != 4 or '?' in move:
         return False
-    m = chess.Move.from_uci(move)
+    try:
+        m = chess.Move.from_uci(move)
+    except ValueError:
+        return False
     return m in b.legal_moves
 
 
@@ -101,6 +110,10 @@ def suggest_moves(theory=True, other_moves=True) -> List:
     Returns list of (UCI, score) tuples
     """
     global b, cursor
+    if not cursor['theory'] and not cursor['moves']:
+        analyse_position(cursor, b)
+        cursor = db.boards.find_one(
+                {'_id': cursor['_id']})
     suggested_moves = list()
     if theory:
         for move in cursor['theory']:

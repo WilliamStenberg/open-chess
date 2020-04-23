@@ -196,6 +196,7 @@ export interface Board {
 	squares: Square[];
 	backStack: IMoveResponse[];
 	forwardStack: IMoveResponse[];
+    graveyard: Piece[];
 }
 
 interface ServiceInit {
@@ -232,17 +233,22 @@ const executeFetchUpdates = (board: Board, commands: string[]) => {
         let start = move.slice(0, 2), end = move.slice(2, 4);
         if (start === '??') {
             // Fetch the object from the remove queue
-            let piece = board.pieces.find((p: Piece) => !p.isOnBoard() && p.squareName() === end);
-            let square = board.squares.find((p: Piece) => p.square === end);
+            if (board.graveyard.length) {
+                let piece = board.graveyard.pop();
+                let square = board.squares.find((p: Piece) => p.square === end);
 
-            if (piece && square) {
-                piece.placeOn(square);
+                if (piece && square) {
+                    piece.placeOn(square);
+                } else {
+                    console.error('Could not resurrect piece');
+                }
             } else {
-                console.error('Could not resurrect piece');
+                console.error('Graveyard empty!');
             }
         } else if (end === '??') {
             let p = board.pieces.find((p: Piece) => p.isOnBoard() && p.squareName() === start);
             if (p) {
+                board.graveyard.push(p);
                 p.remove();
             } else {
                 console.error('malformed command?', move);
@@ -275,6 +281,10 @@ const useBoardByUrlService = () => {
     const doFetch = (endpoint: string, requestDict: { [key: string]: any },
         resolve: (response: StringDict) => void,
         reject?: (response: StringDict) => void) => {
+            let spinner = document.createElement('DIV');
+            spinner.classList.add('loading-spinner');
+            spinner.id = 'loadingSpinner';
+            document.body.appendChild(spinner);
             const reject_func = (reject) ? reject : () => {
             };
             fetch(url + '/' + endpoint, {
@@ -287,8 +297,15 @@ const useBoardByUrlService = () => {
             })
                 .then(response => response.json())
                 .then(response => {
-                    resolve(response);
-                    setService({status: 'loaded', payload: response})
+                    if ('err' in response) {
+                        console.error(response['err'])
+                        reject_func(response);
+                    } else {
+                        resolve(response);
+                        setService({status: 'loaded', payload: response})
+                    }
+                    let spinner = document.getElementById('loadingSpinner');
+                    spinner && spinner.remove();
                 })
                 .catch(error => {
                     setService({status: 'error', error});
@@ -296,6 +313,8 @@ const useBoardByUrlService = () => {
                     console.log(requestDict);
                     console.log(error);
                     reject_func(error);
+                    let spinner = document.getElementById('loadingSpinner');
+                    spinner && spinner.remove();
                 })
 
         };

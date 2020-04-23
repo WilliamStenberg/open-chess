@@ -25,11 +25,11 @@ const StepToolbar: React.FC<{}> = () => {
                 })(board));
 
             } else {
-                console.log('backStack is empty');
+                console.error('backStack is empty');
             }
         }, () => {
             // This fail means no backing possible
-            console.log('Could not back');
+            console.error('Could not back');
         });
     };
 
@@ -47,10 +47,10 @@ const StepToolbar: React.FC<{}> = () => {
 
             }, () => {
                 // This fail means no backing possible
-                console.log('Could not forward');
+                console.error('Could not forward');
             });
         } else {
-            console.log('Empty forward stack');
+            console.error('Empty forward stack');
         }
     };
 

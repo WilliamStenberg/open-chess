@@ -45,3 +45,41 @@ svg text {
     /* Non-prefixed version, currently
                                      supported by Chrome and Opera */
 }
+
+.loading-spinner{
+    display: inline-block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 80px;
+    height: 80px;
+    margin-left: -40px;
+    margin-top: -40px;
+}
+.loading-spinner:after {
+    content: " ";
+    display: block;
+    width: 64px;
+    height: 64px;
+    margin: 8px;
+    border-radius: 50%;
+    border: 6px solid #fff;
+    border-color: #fff transparent #fff transparent;
+    animation: loading-spinner 1.2s linear infinite, appearAnimation 1s;
+}
+
+@keyframes loading-spinner {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes appearAnimation {
+  0%   { opacity:0; }
+  50%  { opacity:0.1; }
+  100% { opacity:1; }
+}
+

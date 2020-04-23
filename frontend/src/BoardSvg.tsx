@@ -1,30 +1,33 @@
 import {GameModel, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint, Board, IMoveResponse, Suggestion} from './BoardService';
 import React from 'react';
 import StepToolbar from './Toolbars';
+import {colors} from './Settings';
 
 type CoordPair = [TPoint, TPoint];
-
 
 interface SvgBoardProps {
     svgobj: Element | null;
 }
 
-const decideArrowColor = (score: number, label: string): string => {
+const decideArrowColor = (score: number, label: string): [string, string] => {
     if (label.toLowerCase().includes('theory')) {
         // Always blue for theory
-        return '#0a9e8a';
+        return ['blue', colors['blue']];
+    }
+    if (score === undefined || score === null) {
+        return ['white', colors['white']];
     }
     if (score < -100)
-        return '#ff0000'; // Blunder = red
+        return ['red', colors['red']]; // Blunder = red
     if (score < -30)
-        return '#fd190d'; // Lightly red for a mistake
+        return ['lightred', colors['lightred']]; // Lightly red for a mistake
     if (score < 0)
-        return '#fd7e0d'; // Orange for inaccuracy
+        return ['orange', colors['orange']]; // Orange for inaccuracy
     if (score < 30)
-        return '#ccc'; // Grey/meh
+        return ['grey', colors['grey']]; // Grey/meh
     if (score < 100)
-        return '#33ca45'; // Light green for a good move
-    return '#0ac421'; // Nice bright green for really good moves
+        return ['lightgreen', colors['lightgreen']]; // Light green for a good move
+    return ['green', colors['green']]; // Nice bright green for really good moves
 }
 
 /**
@@ -45,18 +48,18 @@ const constructArrow: (cp: CoordPair, score: number, label: string) => SVGGEleme
     doc.setAttribute("x2", "" + x2);
     doc.setAttribute("y2", "" + y2);
 
-    let arrowColor = decideArrowColor(score, label);
+    let [arrowName, arrowColor] = decideArrowColor(score, label);
     let opacity = 0.8;
 
     doc.setAttribute("stroke", arrowColor);
     doc.setAttribute("stroke-width", "7");
-    doc.setAttribute("marker-end", "url(#arrowhead)");
+    doc.setAttribute("marker-end", "url(#arrowhead"+arrowName+")");
     doc.setAttribute("opacity", "" + opacity);
     doc.addEventListener("mouseenter", () => {
         doc.setAttribute('opacity', "" + Math.min(opacity + 0.2, 1));
         if (! doc.childNodes.length) {
             let title: SVGElement = document.createElementNS("http://www.w3.org/2000/svg", 'title');
-            let txt = document.createTextNode("a"+score);
+            let txt = document.createTextNode(""+score);
             title.appendChild(txt);
             doc.appendChild(title);
         }
@@ -98,7 +101,6 @@ const updateSvgArrows = (board: Board, suggestions: Suggestion[]) => {
             return found;
         })(board.svg);
         toBeRemoved.forEach(item => board.svg && board.svg.removeChild(item));
-        console.log(suggestions);
         suggestions.forEach((item: Suggestion) => {
             let start = item.move.slice(0, 2), end = item.move.slice(2, 4);
             let from_square = board.squares.find(p => p.squareName() === start);
@@ -171,38 +173,41 @@ const BoardViewer: React.FC<{}> = () => {
 
             let square = 'abcdefgh'.charAt(file) + '87654321'.charAt(rank);
             let move: string = drag.start.squareName() + square;
+            GameModel.drag = null;
             doFetch('move', {move: move}, (resp: IMoveResponse) => {
                 handleFetchMoveResponse(square, resp);
-                GameModel.drag = null;
             }, () => {
                 // This fail means server error, or 'illegal move'
                 if (drag) {
                     // Move rejected! Resetting piece
                     drag.piece.placeOn(drag.start);
                 }
-                GameModel.drag = null;
-
             });
         }
     };
 
 
-    function createArrow(): SVGElement {
-        let arrowForm = document.createElementNS('http://www.w3.org/2000/svg',
-            'marker');
-        arrowForm.setAttribute('id', 'arrowhead');
-        arrowForm.setAttribute('markerWidth', '3');
-        arrowForm.setAttribute('markerHeight', '4');
-        arrowForm.setAttribute('refX', '1.5');
-        arrowForm.setAttribute('refY', '2');
-        arrowForm.setAttribute('orient', 'auto');
-        arrowForm.setAttribute('fill', "#000");
+    function createArrows(): SVGElement[] {
+        let seq: SVGElement[] = [];
+        for (let name in colors) {
+            let color: string = colors[name];
+            let arrowForm = document.createElementNS('http://www.w3.org/2000/svg',
+                'marker');
+            arrowForm.setAttribute('id', 'arrowhead'+name);
+            arrowForm.setAttribute('markerWidth', '3');
+            arrowForm.setAttribute('markerHeight', '4');
+            arrowForm.setAttribute('refX', '1.5');
+            arrowForm.setAttribute('refY', '2');
+            arrowForm.setAttribute('orient', 'auto');
+            arrowForm.setAttribute('fill', color);
 
-        let poly = document.createElementNS('http://www.w3.org/2000/svg',
-            'polygon');
-        poly.setAttribute('points', '0 0, 3 2, 0 4');
-        arrowForm.appendChild(poly);
-        return arrowForm;
+            let poly = document.createElementNS('http://www.w3.org/2000/svg',
+                'polygon');
+            poly.setAttribute('points', '0 0, 3 2, 0 4');
+            arrowForm.appendChild(poly);
+            seq = seq.concat(arrowForm);
+        }
+        return seq;
     }
 
     type LoadBoardDict = { empty: boolean, moves: string };
@@ -248,7 +253,9 @@ const BoardViewer: React.FC<{}> = () => {
                 // Adding arrow support
                 if (defs && defs.firstChild) {
                     // Inserts the arrow form into <defs> tag
-                    defs.appendChild(createArrow());
+                    createArrows().forEach(arr => {
+                        defs.appendChild(arr);
+                    });
                 }
 
                 let newSvg: SVGSVGElement = head;
@@ -349,7 +356,6 @@ const BoardViewer: React.FC<{}> = () => {
 
     return (
         <div>
-        <StepToolbar/>
             <SvgBoard svgobj={board.svg}/>
             {(service.status === 'loading' || service.status === 'init') &&
                 <div>Loading</div>
@@ -360,6 +366,7 @@ const BoardViewer: React.FC<{}> = () => {
         {service.status === 'error' && (
             <div>Yikes! </div>
         )}
+        <StepToolbar/>
 
     </div>
     );
