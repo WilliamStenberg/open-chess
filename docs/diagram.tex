@@ -6,34 +6,34 @@
 \tikzset{every entity/.style={draw=orange , fill=orange!20}}
 \tikzset{every attribute/.style={draw=MediumPurple1, fill=MediumPurple1!20}}
 \tikzset{every relationship/.style={draw=Chartreuse2, fill=Chartreuse2!20}}
+\tikzset{derived relationship/.style={relationship, dashed}}
 \newcommand{\key}[1]{\underline{#1}}
 \begin{document}
 
 \begin{tikzpicture}[node distance =7em]
     \node[entity] (board) {Board};
-    \node[attribute] (zobrist) [left of=board, xshift=-2em] {\key{Zobrist Hash}} edge (board);
+    \node[attribute] (fen) [left of=board, xshift=-2em] {\key{FEN (\_id)}} edge (board);
     \node[attribute] (score) [above left of=board] {Score} edge (board);
-    \node[attribute] (time) [above of=board] {Engine Time} edge (board);
 
-    \node[relationship] (cando) [above right of=board, xshift=2em, yshift=-2em] {Can do} edge (board);
-
-    \node[entity] (move) [right of=board, xshift=7em] {Move} edge (cando);
+    \node[entity] (move) [right of=board, xshift=7em] {Move};
     \node[attribute] (uci) [above of=move] {UCI} edge (move);
     \node[attribute] (san) [above right of=move] {SAN} edge (move);
-    \node[attribute] (mid) [right of=move] {\key{ID}} edge (move);
-    \node[derived attribute] (weight) [below right of=move] {Weight} edge (move);
+    \node[attribute] (scorediff) [below right of=move] {Score diff} edge (move);
 
-    \node[relationship] (leadsto) [below right of=board, xshift=2em, =2em] {Leads to} edge (move);
+    \node[derived relationship] (leadsto) [below right of=board, xshift=2em, =2em] {Leads to} edge (move);
+    \node[relationship] (moves) [right of=board] {Moves} edge (move);
+    \node[relationship] (theory) [above right of=board, xshift=2em, =2em] {Theory} edge (move);
     % Redeclaration for edge reference
+    \node[entity] (board) {Board} edge (moves);
+    \node[entity] (board) {Board} edge (theory);
     \node[entity] (board) {Board} edge (leadsto);
 
-    \node[relationship] (fave) [below of=board] {Favourite} edge (board);
-    \node[entity] (player) [below right of=fave, xshift=2em] {Player} edge (fave);
-    \node[attribute] (pname) [below right of =player] {\key{Name}} edge (player);
+    \node[relationship] (games) [below of=board] {Games} edge (board);
+    \node[entity] (game) [below right of=games, xshift=2em] {Game} edge (games);
+    \node[attribute] (white) [below left of =game] {White (Elo)} edge (game);
 
-    \node[relationship] (knows) [below of=move] {Knows} edge (player);
-    \node[relationship] (knows) [below of=move] {Knows} edge (move);
-    \node[attribute] (rank) [below right of=knows] {Rank} edge (knows);
+    \node[attribute] (black) [below right of=game] {Black (Elo)} edge (game);
+    \node[attribute] (result) [right of=game] {Result} edge (game);
 
 \end{tikzpicture}
 

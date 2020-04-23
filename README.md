@@ -2,14 +2,17 @@
 Python-chess Flask app serving a TypeScript React frontend that 
 displays an interactive chess board.
 
-![Alt text](img/with_arrows.png?raw=true "Title")
+![Alt text](img/colored_arrows.png?raw=true "Title")
 
 ## Install
-Clone this repository, run `pip install requirements.txt` from project root
+Clone this repository, run `pip install -r requirements.txt` from project root
 to install Python dependencies.
 
 `cd` into the `frontend` folder and run `npm install` to install React dependencies.
 This requires having installed Node.JS/npm.
+
+This software requires a MongoDB database named `chessdb`, the `mongod` service
+needs to be running on the same host as the server.
 
 ## Run
 The frontend can be run through Node.JS development server with 
@@ -29,6 +32,9 @@ is not needed.
 Running `npm run start` runs the frontend at port 3000, and updates continuously
 as the frontend code is edited. The Flask server must still be running for the frontend
 to be able to fetch data. This is useful for quick development.
+
+## Reference
+The software is documented [here](docs/architecture.pdf).
 
 ## License
 This project is <i>Free Software</i>. Please refer to the GPL3 license for more information.
