@@ -55,6 +55,14 @@ def flask_move():
     return jsonify(ret_dict), 200
 
 
+@app.route('/analyse', methods=['POST'])
+def flask_prompted_analysis():
+    ret_dict = {'success': True}
+    motor.trigger_analysis()
+    ret_dict['suggestions'] = motor.suggest_moves()
+    return jsonify(ret_dict), 200
+    
+
 @app.route('/back', methods=['POST'])
 def flask_step_back():
     """

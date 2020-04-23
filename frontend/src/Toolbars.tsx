@@ -134,10 +134,23 @@ const StepToolbar: React.FC<{}> = () => {
         })(board));
     }
 
+    const promptAnalysis = () => {
+        doFetch('analyse', {}, (resp: IMoveResponse) => {
+            setBoard(((b: Board) => {
+                updateSvgArrows(b, resp.suggestions);
+                return b;
+            })(board));
+        }, () => {
+            // This fail means no backing possible
+            console.error('Could not analyse position');
+        });
+    }
+
     return (
         <div>
             <button id='backButton' onClick={stepBack}>Back</button>
             <button id='flipButton' onClick={flipBoard}>Flip</button>
+            <button id='flipButton' onClick={promptAnalysis}>Analyse</button>
 
             <button id='forwardButton' onClick={stepForward}>Forward</button>
         </div>

@@ -26,7 +26,13 @@ def board_step(move_uci: str):
     found = False
     for reply in cursor['theory'] + cursor['moves']:
         if reply['uci'] == move_uci:
+            old_cursor = cursor.copy()
             cursor = db.boards.find_one({'_id': reply['leads_to']})
+            if not cursor['score']:
+                print('The move is known, but not evaluated')
+                analyse_position(old_cursor, b,
+                                 [chess.Move.from_uci(move_uci)])
+                cursor = db.boards.find_one({'_id': reply['leads_to']})
             b.push_uci(reply['uci'])
             found = True
             break
@@ -102,6 +108,13 @@ def game_move(move: str, ret_dict) -> None:
             ret_dict['updates'].append(start + end)
             ret_dict['revert'].append(end + start)
     board_step(board_move.uci())
+
+
+def trigger_analysis():
+    """ Trigger a longer analysis """
+    global b, cursor
+    analyse_position(cursor, b, extended=True)
+    cursor = db.boards.find_one({'_id': cursor['_id']})
 
 
 def suggest_moves(theory=True, other_moves=True) -> List:

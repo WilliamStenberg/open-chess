@@ -260,8 +260,12 @@ def crawl_troubleshoot_scoring(adjust=False):
     rec_crawler()
 
 
-def analyse_position(eval_cursor, eval_board, root_moves=None):
-    """ Commit analysis to DB """
+def analyse_position(eval_cursor, eval_board, root_moves=None, extended=False):
+    """
+    Commit analysis to DB.
+    Can confine to given root moves,
+    or search for new moves with extended=True
+    """
     if root_moves:
         time_limit = chess.engine.Limit(
             time=min(5, max(2, len(root_moves))))
@@ -270,10 +274,24 @@ def analyse_position(eval_cursor, eval_board, root_moves=None):
             root_moves=root_moves,
             multipv=len(root_moves))
     else:
-        time_limit = chess.engine.Limit(time=2)
-        lines = engine.analyse(
-            eval_board, time_limit,
-            multipv=3)
+        if extended:
+            taken_ucis = list(map(
+                lambda m: m['uci'],
+                eval_cursor['theory'] + eval_cursor['moves']))
+            scout_lines = engine.analyse(
+                eval_board, chess.engine.Limit(time=0.3),
+                multipv=len(taken_ucis) + 3)
+            scouted_moves = list(map(lambda line: line['pv'][0], scout_lines))
+            new_moves = [m for m in scouted_moves
+                         if m.uci() not in taken_ucis]
+            lines = engine.analyse(
+                eval_board, chess.engine.Limit(time=3),
+                root_moves=new_moves,
+                multipv=len(new_moves))
+        else:
+            lines = engine.analyse(
+                eval_board, chess.engine.Limit(time=2),
+                multipv=3)
 
     uci_score_dict = {
         line['pv'][0].uci(): line['score'].relative.score(
