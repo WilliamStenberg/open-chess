@@ -1,7 +1,8 @@
 import {GameModel, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint, Board, IMoveResponse, Suggestion} from './BoardService';
 import React from 'react';
-import StepToolbar from './Toolbars';
+import {StepToolbar, Favorites} from './Toolbars';
 import {colors} from './Settings';
+import {Column} from 'rbx';
 
 type CoordPair = [TPoint, TPoint];
 
@@ -355,7 +356,11 @@ const BoardViewer: React.FC<{}> = () => {
     }
 
     return (
-        <div>
+        <Column.Group>
+            <Column size='one-fifth'>
+                <Favorites/>
+            </Column>
+            <Column size='three-fifths'>
             <SvgBoard svgobj={board.svg}/>
             {(service.status === 'loading' || service.status === 'init') &&
                 <div>Loading</div>
@@ -366,9 +371,13 @@ const BoardViewer: React.FC<{}> = () => {
         {service.status === 'error' && (
             <div>Yikes! </div>
         )}
-        <StepToolbar/>
+            <StepToolbar/>
+        </Column>
+        <Column size='one-fifth'>
+        </Column>
 
-    </div>
+    </Column.Group>
+
     );
 };
 

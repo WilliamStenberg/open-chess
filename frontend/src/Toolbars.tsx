@@ -1,7 +1,9 @@
-import {GameModel, useBoardByUrlService, Board, IMoveResponse, svgPoint} from './BoardService';
-import React from 'react';
+import {GameModel, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, Suggestion} from './BoardService';
+import React, {useState, useEffect} from 'react';
 import { updateSvgArrows } from './BoardSvg'
-
+import {Input, Button, List, Icon} from 'rbx';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faTrash} from '@fortawesome/free-solid-svg-icons'
 /**
  * Toolbar to step forward and backward, and switch sides
  */
@@ -148,13 +150,91 @@ const StepToolbar: React.FC<{}> = () => {
 
     return (
         <div>
-            <button id='backButton' onClick={stepBack}>Back</button>
-            <button id='flipButton' onClick={flipBoard}>Flip</button>
-            <button id='flipButton' onClick={promptAnalysis}>Analyse</button>
-
-            <button id='forwardButton' onClick={stepForward}>Forward</button>
+            <Button id='backButton' onClick={stepBack}>Back</Button>
+            <Button id='flipButton' onClick={flipBoard}>Flip</Button>
+            <Button id='promptAnalysisButton' onClick={promptAnalysis}>Analyse</Button>
+            <Button id='forwardButton' onClick={stepForward}>Forward</Button>
         </div>
     );
 };
 
-export default StepToolbar;
+const Favorites: React.FC<{}> = () => {
+    const [text, setText] = useState<string>('');
+    const [faveList, setFaveList] = useState<string[]>([]);
+    const {board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
+
+    const addFavorite = () => {
+        doFetch('favorites/add', {name: text}, (resp: StringDict) => {
+            setFaveList(fl => fl.concat(text));
+            setText('');
+        }, (error) => {
+            console.error('Could not add favorite');
+        });
+    };
+
+    const getFavorites = () => {
+        doFetch('favorites/list', {}, (resp: StringDict) => {
+            setFaveList(resp.favorites);
+          });
+    }
+
+    const loadFavorite = (favoriteName: string) => {
+        doFetch('favorites/load', {name: favoriteName}, (resp: IMoveResponse) => {
+            setBoard(((b: Board) => {
+                resp.revert = resp.revert.reverse();
+                while (b.backStack.length) {
+                    let latest = b.backStack[b.backStack.length - 1];
+                    executeFetchUpdates(b, latest.revert);
+                    b.backStack.pop();
+                }
+                b.backStack = [resp];
+                executeFetchUpdates(b, resp.updates);
+                b.forwardStack = [];
+                updateSvgArrows(b, resp.suggestions);
+                return b;
+            })(board));
+        }, (error) => {
+            console.error(error);
+        });
+    }
+
+    const removeFavorite = (favoriteName: string) => {
+        doFetch('favorites/remove', {name: favoriteName}, (resp: IMoveResponse) => {
+            setFaveList(fl => {
+                const index = fl.indexOf(favoriteName, 0);
+                if (index > -1) {
+                    fl.splice(index, 1);
+                }
+                return fl;
+            });
+        }, (error) => {
+            console.error(error);
+        });
+    }
+
+    useEffect(getFavorites, []); // Run only on component load
+
+    return (
+        <div>
+            <List className='favorites'>
+                {faveList.map((f, i) => {
+                    return (
+                        <List.Item className='favorite' key={i} onClick={() => loadFavorite(f)}>
+
+                        {f}
+                        <Icon color='danger' key='danger' size='small'
+                        onClick={(e: MouseEvent) => {e.stopPropagation(); removeFavorite(f); }} >
+                            <FontAwesomeIcon icon={faTrash} size='xs' />
+
+                        </Icon>
+                    </List.Item>)
+                })}
+            </List>
+            <Input type="text" placeholder="Add position name" value={text} className='favorite-bar'
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value)} />
+        <Button className='favorite-add-btn' onClick={addFavorite}>Add</Button>
+    </div>
+    );
+};
+
+export {StepToolbar, Favorites};

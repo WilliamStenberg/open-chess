@@ -8,6 +8,6 @@ export const colors: Dict = {
     'lightred': '#fd190d',
     'orange': '#fd7e0d',
     'grey': '#cccccc',
-    'lightgreen': '#33ca45',
-    'green': '#0ac421'
+    'lightgreen': '#54d764',
+    'green': '#0ec124'
 }

@@ -2,7 +2,7 @@
 The chess motor reads Polyglot (.bin) files,
 and uses Stockfish to analyze legal moves' scores.
 """
-from typing import List
+from typing import List, Dict
 
 import chess
 import chess.engine
@@ -72,8 +72,10 @@ def game_move(move: str, ret_dict) -> None:
     to populate with move-related data
     """
     global b, cursor
-    ret_dict['updates'] = list()
-    ret_dict['revert'] = list()
+    if not 'updates' in ret_dict:
+        ret_dict['updates'] = list()
+    if not 'revert' in ret_dict:
+        ret_dict['revert'] = list()
     # TODO extend from legal move to "good move" by Polyglot or Stockfish
     board_move = chess.Move.from_uci(move)
     start = move[:2]
@@ -153,6 +155,65 @@ def can_step_back() -> bool:
 
 
 def step_back():
+    """ Pops the Board stack and updates cursor """
     global b, cursor
     b.pop()
     cursor = db.boards.find_one({'_id': b.fen()})
+
+
+def add_position_as_favorite(name: str) -> bool:
+    """
+    Insert board as favorite if name and FEN does not exist in DB,
+    also registers move stack to replicate move-by-move.
+    Returns success boolean
+    """
+    global b
+    found = db.favorites.find_one({'name': name})
+    if found:
+        return None
+    found = db.favorites.find_one({'fen': b.fen()})
+    if found:
+        return None
+    favorite_object = {
+        'name': name,
+        'fen': b.fen(),
+        'uci_stack': [m.uci() for m in b.move_stack]
+    }
+    db.favorites.insert_one(favorite_object)
+    return True
+
+
+def remove_position_as_favorite(name: str) -> bool:
+    """ Removes a favorite object by name """
+
+    found = db.favorites.find_one({'name': name})
+    if not found:
+        return False
+    return db.favorites.delete_one({'name': name}).deleted_count> 0
+
+
+def get_favorite_list() -> List:
+    """ Fetch all favorites from DB """
+    return list(map(lambda x: x['name'], db.favorites.find({})))
+
+
+def load_favorite_by_name(name: str, ret_dict: Dict):
+    """
+    Resets board and steps through a favorite move stack,
+    Populates ret_dict. Returns success boolean.
+    """
+    global b, cursor
+    favorite_object = db.favorites.find_one({'name': name})
+    if not favorite_object:
+        return False
+    while b.move_stack:
+        b.pop()
+    cursor = db.boards.find_one({'_id': b.fen()})
+    ret_dict['updates'] = []
+    ret_dict['revert'] = []
+    for move_uci in favorite_object['uci_stack']:
+        print('abla', move_uci)
+        game_move(move_uci, ret_dict)
+
+    print(ret_dict)
+    return True

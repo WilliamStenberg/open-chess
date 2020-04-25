@@ -76,3 +76,52 @@ def flask_step_back():
     return jsonify({'success': True}), 200
 
 
+@app.route('/favorites/add', methods=['POST'])
+def flask_add_favorite():
+    """ Try to add favorite, return simple stringdict """
+    req_json = request.json
+    if 'name' not in req_json:
+        return jsonify({'err': 'No name given'}), 400
+
+    inserted = motor.add_position_as_favorite(req_json['name'])
+    if inserted:
+        return jsonify({'success': True}), 200
+    return jsonify({'err': 'Favorite already exists!'}), 400
+
+
+@app.route('/favorites/remove', methods=['POST'])
+def flask_remove_favorite():
+    """ Try to add favorite, return simple stringdict """
+    req_json = request.json
+    if 'name' not in req_json:
+        return jsonify({'err': 'No name given'}), 400
+
+    removed = motor.remove_position_as_favorite(req_json['name'])
+    if removed:
+        return jsonify({'success': True}), 200
+    return jsonify({'err': 'Favorite not found'}), 400
+    
+
+@app.route('/favorites/list', methods=['POST'])
+def flask_list_favorites():
+    """ Try to add favorite, return simple stringdict """
+    seq = motor.get_favorite_list()
+    return jsonify({'favorites': seq}), 200
+
+
+@app.route('/favorites/load', methods=['POST'])
+def flask_load_favorite():
+    """
+    Populates a large ret_dict with reproducing
+    steps for a favorite board
+    """
+    req_json = request.json
+    if 'name' not in req_json:
+        return jsonify({'err': 'No name given'}), 400
+    ret_dict = {'success': True}
+    name = req_json['name']
+    success = motor.load_favorite_by_name(name, ret_dict)
+    if not success:
+        return jsonify({'err': 'Could not load favorite '+name}), 400
+    ret_dict['suggestions'] = motor.suggest_moves()
+    return jsonify(ret_dict), 200

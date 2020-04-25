@@ -83,3 +83,19 @@ svg text {
   100% { opacity:1; }
 }
 
+.favorites {
+    max-height: 6rem;
+    overflow-y: scroll;
+}
+.favorite {
+    font-size: 12px;
+}
+
+.favorite-bar {
+    width: 75% !important;
+    margin: 0 !important
+}
+
+.favorite-add-btn {
+    width: 25%;
+}
