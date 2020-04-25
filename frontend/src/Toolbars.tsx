@@ -1,4 +1,4 @@
-import {GameModel, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, Suggestion} from './BoardService';
+import {GameModel, GameMode, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, Suggestion} from './BoardService';
 import React, {useState, useEffect} from 'react';
 import { updateSvgArrows } from './BoardSvg'
 import {Input, Button, List, Icon} from 'rbx';
@@ -10,7 +10,7 @@ import { faTrash} from '@fortawesome/free-solid-svg-icons'
 const StepToolbar: React.FC<{}> = () => {
     const {board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
     const stepBack = () => {
-        doFetch('back', {}, (resp: IMoveResponse) => {
+        doFetch('back', {practise: board.gameMode === GameMode.Practise}, (resp: IMoveResponse) => {
             if (board.backStack.length) {
                 setBoard(((b: Board) => {
                     let latest = b.backStack[b.backStack.length - 1];
@@ -18,7 +18,7 @@ const StepToolbar: React.FC<{}> = () => {
                     b.backStack.pop();
                     b.forwardStack.push(latest);
                     let previous = b.backStack[b.backStack.length - 1];
-                    if (previous && previous.suggestions) {
+                    if (previous && previous.suggestions && board.gameMode === GameMode.Explore) {
                         updateSvgArrows(b, previous.suggestions);
                     } else {
                         updateSvgArrows(b, []);
@@ -38,12 +38,16 @@ const StepToolbar: React.FC<{}> = () => {
     const stepForward = () => {
         if (board.forwardStack.length) {
             let next = board.forwardStack[board.forwardStack.length - 1];
-            next && doFetch('move', {move: next.move}, (resp: IMoveResponse) => {
+            next && doFetch('explore/move', {moves: next.moves}, (resp: IMoveResponse) => {
                 setBoard(((b: Board) => {
                     executeFetchUpdates(b, resp.updates);
                     b.forwardStack.pop();
                     b.backStack.push(resp);
-                    updateSvgArrows(b, resp.suggestions);
+                    if (b.gameMode === GameMode.Explore) {
+                        updateSvgArrows(b, resp.suggestions);
+                    } else {
+                        updateSvgArrows(b, []);
+                    }
                     return b;
                 })(board));
 
@@ -181,7 +185,7 @@ const Favorites: React.FC<{}> = () => {
     const loadFavorite = (favoriteName: string) => {
         doFetch('favorites/load', {name: favoriteName}, (resp: IMoveResponse) => {
             setBoard(((b: Board) => {
-                resp.revert = resp.revert.reverse();
+                //resp.revert = resp.revert.reverse();
                 while (b.backStack.length) {
                     let latest = b.backStack[b.backStack.length - 1];
                     executeFetchUpdates(b, latest.revert);
@@ -237,4 +241,37 @@ const Favorites: React.FC<{}> = () => {
     );
 };
 
-export {StepToolbar, Favorites};
+const ModeSelector: React.FC<{}> = () => {
+    const {board, setBoard} = useBoardByUrlService();
+    const setExploreMode = () => {
+        setBoard(((b: Board) => {
+            b.gameMode = GameMode.Explore;
+            if (b.backStack.length) {
+                let previous = b.backStack[b.backStack.length - 1];
+                if (previous && previous.suggestions) {
+                    updateSvgArrows(b, previous.suggestions);
+                }
+            }
+            return b;
+        })(board));
+    };
+    const setPractiseMode = () => {
+        setBoard(((b: Board) => {
+            b.gameMode = GameMode.Practise;
+            updateSvgArrows(b, []);
+            return b;
+        })(board));
+    };
+    useEffect(setExploreMode, []);
+    return (
+        <List>
+            <List.Item id='exploreItem' onClick={setExploreMode}
+            active={board.gameMode === GameMode.Explore}>Explore</List.Item>
+            <List.Item id='practiseItem'onClick={setPractiseMode}
+            active={board.gameMode === GameMode.Practise}>Practise</List.Item>
+
+        </List>
+    );
+}
+
+export {StepToolbar, Favorites, ModeSelector};

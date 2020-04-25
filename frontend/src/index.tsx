@@ -8,7 +8,8 @@ import * as serviceWorker from './serviceWorker';
 setGlobal({
     board: {
 		svg: null, svgPoint: null,
-		pieces: [], squares: [], backStack: [], forwardStack: [], graveyard: []
+        pieces: [], squares: [], backStack: [], forwardStack: [],
+        graveyard: [], gameModel: null
 	}});
 ReactDOM.render(<App/>, document.getElementById('root'));
 

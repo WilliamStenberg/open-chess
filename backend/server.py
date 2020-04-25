@@ -36,20 +36,44 @@ def supply_svg():
     return jsonify({'svg': svg}), 200
 
 
-@app.route('/move', methods=['POST'])
-def flask_move():
+@app.route('/explore/move', methods=['POST'])
+def flask_explore_move():
     """ Tries to perform JSON dict['move'] as UCI move on the board"""
     if not request.is_json:
         return jsonify({'err': 'Could not parse request: Expected JSON'}), 400
     req_json = request.json
-    if 'move' not in req_json:
+    print('err here', req_json)
+    if 'moves' not in req_json:
+        return jsonify({'err': 'Could not parse request: No moves'}), 400
+
+    moves = req_json['moves']
+    ret_dict = {'success': True}
+    for move in moves:
+        if not motor.is_valid_move(move):
+            return jsonify({'err': 'Not a valid move'}), 402
+        motor.game_move(move, ret_dict)
+    ret_dict['suggestions'] = motor.suggest_moves()
+    return jsonify(ret_dict), 200
+
+
+@app.route('/practise/move', methods=['POST'])
+def flask_practise_move():
+    """ Tries to perform JSON dict['move'] as UCI move on the board"""
+    if not request.is_json:
+        return jsonify({'err': 'Could not parse request: Expected JSON'}), 400
+    req_json = request.json
+    if 'moves' not in req_json:
         return jsonify({'err': 'Could not parse request: No move'}), 400
-    move = req_json['move']
+    move = req_json['moves'][0]
     if not motor.is_valid_move(move):
         return jsonify({'err': 'Not a valid move'}), 402
 
-    ret_dict = {'success': True}
-    motor.game_move(move, ret_dict)
+    if motor.is_good_move(move):
+        ret_dict = {'success': True}
+        motor.game_move(move, ret_dict)
+        motor.push_practise_move(ret_dict)
+    else:
+        ret_dict = {'success': False, 'updates': []}
     ret_dict['suggestions'] = motor.suggest_moves()
     print(ret_dict)
     return jsonify(ret_dict), 200
@@ -57,11 +81,12 @@ def flask_move():
 
 @app.route('/analyse', methods=['POST'])
 def flask_prompted_analysis():
+    """ Trigger an analysis and return suggestions """
     ret_dict = {'success': True}
     motor.trigger_analysis()
     ret_dict['suggestions'] = motor.suggest_moves()
     return jsonify(ret_dict), 200
-    
+
 
 @app.route('/back', methods=['POST'])
 def flask_step_back():
@@ -73,6 +98,10 @@ def flask_step_back():
         return jsonify({'err': 'Cannot step back'}), 402
 
     motor.step_back()
+    req_json = request.json
+    if 'practise' in req_json and req_json['practise']:
+        print('Double back')
+        motor.step_back()
     return jsonify({'success': True}), 200
 
 

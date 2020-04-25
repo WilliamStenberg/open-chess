@@ -1,6 +1,6 @@
-import {GameModel, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint, Board, IMoveResponse, Suggestion} from './BoardService';
+import {GameModel, GameMode, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint, Board, IMoveResponse, Suggestion} from './BoardService';
 import React from 'react';
-import {StepToolbar, Favorites} from './Toolbars';
+import {StepToolbar, Favorites, ModeSelector} from './Toolbars';
 import {colors} from './Settings';
 import {Column} from 'rbx';
 
@@ -124,18 +124,6 @@ const updateSvgArrows = (board: Board, suggestions: Suggestion[]) => {
 const BoardViewer: React.FC<{}> = () => {
     const {service, board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
 
-    const handleFetchMoveResponse = (squareUpped: string, resp: IMoveResponse) => {
-        // TODO call arrows with suggestions
-        setBoard(((b: Board)=> {
-            executeFetchUpdates(b, resp.updates);
-            b.backStack.push(resp);
-            b.forwardStack = [];
-            updateSvgArrows(b, resp.suggestions);
-            return b;
-        })(board));
-
-    };
-
     const onPieceMouseDown: { (pc: Piece, evt: Event): void } = (pc, _) => {
         GameModel.drag = {piece: pc, start: pc.occupying};
     };
@@ -175,8 +163,21 @@ const BoardViewer: React.FC<{}> = () => {
             let square = 'abcdefgh'.charAt(file) + '87654321'.charAt(rank);
             let move: string = drag.start.squareName() + square;
             GameModel.drag = null;
-            doFetch('move', {move: move}, (resp: IMoveResponse) => {
-                handleFetchMoveResponse(square, resp);
+            let endpoint = board.gameMode + '/move';
+            doFetch(endpoint, {moves: [move]}, (resp: IMoveResponse) => {
+                setBoard(((b: Board)=> {
+                    if (! resp.success) {
+                        if (drag)
+                          drag.piece.placeOn(drag.start);
+                        updateSvgArrows(b, resp.suggestions);
+                    } else {
+                        b.backStack.push(resp);
+                        b.forwardStack = [];
+                        executeFetchUpdates(b, resp.updates);
+                        updateSvgArrows(b, board.gameMode === GameMode.Explore ? resp.suggestions : []);
+                    }
+                    return b;
+                })(board));
             }, () => {
                 // This fail means server error, or 'illegal move'
                 if (drag) {
@@ -358,6 +359,7 @@ const BoardViewer: React.FC<{}> = () => {
     return (
         <Column.Group>
             <Column size='one-fifth'>
+                <ModeSelector/>
                 <Favorites/>
             </Column>
             <Column size='three-fifths'>

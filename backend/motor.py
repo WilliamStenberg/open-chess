@@ -3,7 +3,7 @@ The chess motor reads Polyglot (.bin) files,
 and uses Stockfish to analyze legal moves' scores.
 """
 from typing import List, Dict
-
+import random
 import chess
 import chess.engine
 import chess.polyglot
@@ -28,7 +28,9 @@ def board_step(move_uci: str):
         if reply['uci'] == move_uci:
             old_cursor = cursor.copy()
             cursor = db.boards.find_one({'_id': reply['leads_to']})
-            if not cursor['score']:
+            if cursor is None or \
+               'score' not in cursor or \
+               cursor['score'] is None:
                 print('The move is known, but not evaluated')
                 analyse_position(old_cursor, b,
                                  [chess.Move.from_uci(move_uci)])
@@ -65,6 +67,23 @@ def is_valid_move(move: str) -> bool:
     return m in b.legal_moves
 
 
+def is_good_move(move: str) -> bool:
+    """
+    A move is good if it is theory, or there is no
+    available theory and the move is the best of the
+    known moves. An unknown move can never be good.
+    """
+    global cursor
+    if cursor['theory']:
+        return move in map(lambda m: m['uci'], cursor['theory'])
+    if not cursor['moves']:
+        trigger_analysis()
+    best_other_move = sorted(
+        cursor['moves'],
+        key=lambda m: m['score_diff'], reverse=True)[0]
+    return move == best_other_move['uci']
+
+
 def game_move(move: str, ret_dict) -> None:
     """
     Updates game state with given move.
@@ -72,44 +91,62 @@ def game_move(move: str, ret_dict) -> None:
     to populate with move-related data
     """
     global b, cursor
-    if not 'updates' in ret_dict:
+    if 'updates' not in ret_dict:
         ret_dict['updates'] = list()
-    if not 'revert' in ret_dict:
+    if 'revert' not in ret_dict:
         ret_dict['revert'] = list()
+    if 'moves' not in ret_dict:
+        ret_dict['moves'] = list()
     # TODO extend from legal move to "good move" by Polyglot or Stockfish
     board_move = chess.Move.from_uci(move)
     start = move[:2]
     end = move[2:]
-    ret_dict['move'] = move
+    ret_dict['moves'].append(move)
     if b.is_en_passant(board_move):
         pawn_square = move[2] + str(int(move[3]) + (-1 if b.turn else 1))
         ret_dict['updates'].append(pawn_square + '??')  # Remove
         ret_dict['updates'].append(start + end)  # Affirm the requested move
-        ret_dict['revert'].append(end + start)  # Slide back the pawn
-        ret_dict['revert'].append('??' + pawn_square)  # Create
+        revert_pair = [end + start, '??' + pawn_square]
+
+        ret_dict['revert'] = revert_pair + ret_dict['revert']
 
     elif b.is_kingside_castling(board_move):
         ret_dict['updates'].append(start + end)
         ret_dict['updates'].append('h1f1' if b.turn else 'h8f8')
-        ret_dict['revert'].append(end + start)  # King go back
-        ret_dict['revert'].append('f1h1' if b.turn else 'f8h8')
+        revert_pair = [end + start, 'f1h1' if b.turn else 'f8h8']
+        ret_dict['revert'] = revert_pair + ret_dict['revert']
     elif b.is_queenside_castling(board_move):
         ret_dict['updates'].append(start + end)
         ret_dict['updates'].append('a1d1' if b.turn else 'a8d8')
-        ret_dict['revert'].append(end + start)  # King go back
-        ret_dict['revert'].append('d1a1' if b.turn else 'd8a8')
+        revert_pair = [end + start, 'd1a1' if b.turn else 'd8a8']
+        ret_dict['revert'] = revert_pair + ret_dict['revert']
     else:
         remove = b.piece_at(board_move.to_square)
         if remove:
             ret_dict['updates'].append(end + '??')
             ret_dict['updates'].append(start + end)
-            ret_dict['revert'].append(end + start)
-            ret_dict['revert'].append('??' + end)
+            revert_pair = [end + start, '??' + end]
+            ret_dict['revert'] = revert_pair + ret_dict['revert']
         else:
             # Regular move
             ret_dict['updates'].append(start + end)
-            ret_dict['revert'].append(end + start)
+            ret_dict['revert'] = [end + start] + ret_dict['revert']
     board_step(board_move.uci())
+
+
+def push_practise_move(ret_dict: Dict):
+    """
+    Have the engine push a known move to the currect game,
+    used in practise mode.
+    Modifies ret_dict, no return.
+    """
+    global b, cursor
+    if not cursor['theory'] and not cursor['moves']:
+        trigger_analysis()
+    candidate_ucis = list(map(
+        lambda m: m['uci'],
+        cursor['theory'] + cursor['moves']))
+    game_move(random.choice(candidate_ucis), ret_dict)
 
 
 def trigger_analysis():

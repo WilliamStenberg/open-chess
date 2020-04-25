@@ -2,6 +2,10 @@ import {useGlobal} from 'reactn';
 import {useState} from 'react';
 import {url} from './Settings';
 
+export enum GameMode {
+    Explore = "explore", Practise="practise",
+}
+
 export interface Drag {
 	piece: Piece;
 	start: Square;
@@ -29,7 +33,7 @@ export type Suggestion = { move: string, score: number, label: string };
  */
 export interface IMoveResponse {
     success: boolean;
-    move: string;
+    moves: string[];
     suggestions: Suggestion[];
     updates: string[];
     revert: string[];
@@ -197,6 +201,7 @@ export interface Board {
 	backStack: IMoveResponse[];
 	forwardStack: IMoveResponse[];
     graveyard: Piece[];
+    gameMode: GameMode;
 }
 
 interface ServiceInit {

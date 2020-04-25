@@ -86,6 +86,7 @@ svg text {
 .favorites {
     max-height: 6rem;
     overflow-y: scroll;
+    margin-bottom: 0.1rem !important;
 }
 .favorite {
     font-size: 12px;

@@ -38,6 +38,8 @@ def insert_board(board_fen: str, theory=None, other_moves=None,
                 found['moves'] = [m for m in found['moves']
                                   if m['uci'] != elem['uci']]
                 found['theory'].append(existing)
+            else:
+                found['theory'].append(elem)
 
         for elem in other_moves:
             if elem['uci'] in existing_theory_ucis or \
