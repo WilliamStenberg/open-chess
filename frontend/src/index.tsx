@@ -9,7 +9,7 @@ setGlobal({
     board: {
 		svg: null, svgPoint: null,
         pieces: [], squares: [], backStack: [], forwardStack: [],
-        graveyard: [], gameModel: null
+        graveyard: [], gameModel: null, focusedSuggestionUci: null
 	}});
 ReactDOM.render(<App/>, document.getElementById('root'));
 

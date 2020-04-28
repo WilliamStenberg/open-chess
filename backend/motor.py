@@ -166,13 +166,15 @@ def suggest_moves(theory=True, other_moves=True) -> List:
     suggested_moves = list()
     if theory:
         for move in cursor['theory']:
+            san = b.san(chess.Move.from_uci(move['uci']))
             suggested_moves.append({
-                'move': move['uci'], 'score': move['score_diff'],
+                'move': move['uci'], 'san': san, 'score': move['score_diff'],
                 'label': 'Theory move'})
     if other_moves:
         for move in cursor['moves']:
+            san = b.san(chess.Move.from_uci(move['uci']))
             suggested_moves.append({
-                'move': move['uci'], 'score': move['score_diff'],
+                'move': move['uci'], 'san': san, 'score': move['score_diff'],
                 'label': 'Other move'})
 
     return suggested_moves

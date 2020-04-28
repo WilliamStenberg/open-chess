@@ -100,3 +100,36 @@ svg text {
 .favorite-add-btn {
     width: 25%;
 }
+
+.info {
+    color: #3273dc;
+}
+
+.detail-divider {
+    margin-top: 0.5rem !important;
+}
+
+.suggestion-button {
+    width: 100%;
+    border: 0px !important;
+}
+
+.suggestion-list {
+    display: block;
+}
+
+.suggestion-list-hidden {
+    display: none;
+}
+
+.suggestion-list-item {
+    padding: 0.2rem 0.4rem !important;
+}
+
+.suggestion-menu-button {
+    min-width: 75%;
+}
+
+.button-spacer {
+    min-width: 1rem;
+}

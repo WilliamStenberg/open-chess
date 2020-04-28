@@ -26,7 +26,7 @@ export class TPoint {
 	}
 }
 
-export type Suggestion = { move: string, score: number, label: string };
+export type Suggestion = { move: string, san: string, score: number, label: string };
 
 export type RevertibleMove = {
     move: string, updates: string[],
@@ -206,6 +206,7 @@ export interface Board {
 	forwardStack: RevertibleMove[];
     graveyard: Piece[];
     gameMode: GameMode;
+    focusedSuggestionUci: string;
 }
 
 interface ServiceInit {
@@ -234,7 +235,6 @@ type Service<T> =
 
 
 export type StringDict = { [key: string]: any }
-
 
 const executeFetchUpdates = (board: Board, commands: string[]) => {
     // TODO: Could be optimized by a single loop over board pieces?

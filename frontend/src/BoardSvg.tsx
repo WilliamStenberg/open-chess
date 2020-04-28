@@ -1,8 +1,8 @@
 import {GameModel, GameMode, Square, Piece, StringDict, useBoardByUrlService, TPoint, svgPoint, Board, IMoveResponse, Suggestion} from './BoardService';
 import React from 'react';
-import {StepToolbar, Favorites, ModeSelector} from './Toolbars';
+import {StepToolbar, Favorites, ModeSelector, SuggestionTools} from './Toolbars';
 import {colors} from './Settings';
-import {Column} from 'rbx';
+import {Column, Box, Divider} from 'rbx';
 
 type CoordPair = [TPoint, TPoint];
 
@@ -35,7 +35,7 @@ const decideArrowColor = (score: number, label: string): [string, string] => {
  * From a given coordinate pair (parsed from a move),
  * create an SVG object for an arrow having
  */
-const constructArrow: (cp: CoordPair, score: number, label: string) => SVGGElement = (coordPair, score, label) => {
+const constructArrow: (cp: CoordPair, score: number, label: string, move: string) => SVGGElement = (coordPair, score, label, move) => {
     let doc: SVGLineElement = document.createElementNS("http://www.w3.org/2000/svg",
         "line");
     // Adjusting positions for center-square coordinates
@@ -71,6 +71,11 @@ const constructArrow: (cp: CoordPair, score: number, label: string) => SVGGEleme
             doc.removeChild(doc.childNodes[0]);
         }
     }, false);
+
+    doc.addEventListener("click", () => {
+        let btn = document.getElementById('suggestionList'+move);
+        btn && btn.click();
+    });
 
     // Wrapping in a g tag for opacity to take effect on the line marker (arrow head)
     let g: SVGGElement = document.createElementNS("http://www.w3.org/2000/svg",
@@ -108,7 +113,7 @@ const updateSvgArrows = (board: Board, suggestions: Suggestion[]) => {
             let to_square = board.squares.find(p => p.squareName() === end);
             if (from_square && to_square) {
                 let arrowForm = constructArrow([from_square.getPosition(), to_square.getPosition()],
-                    item.score, item.label);
+                    item.score, item.label, item.move);
                 board.svg && board.svg.insertBefore(arrowForm, firstPiece);
             }
         });
@@ -381,7 +386,12 @@ const BoardViewer: React.FC<{}> = () => {
             <StepToolbar/>
         </Column>
         <Column size='one-fifth'>
-        </Column>
+            <Box>
+                <Divider className='detail-divider'>Details</Divider>
+                {board.gameMode === GameMode.Explore && (
+                    <SuggestionTools/>)}
+        </Box>
+    </Column>
 
     </Column.Group>
 

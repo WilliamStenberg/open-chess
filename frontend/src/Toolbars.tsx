@@ -1,9 +1,9 @@
-import {GameModel, GameMode, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, StepBackResponse, AnalysisResponse} from './BoardService';
+import {GameModel, GameMode, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, StepBackResponse, AnalysisResponse, Suggestion} from './BoardService';
 import React, {useState, useEffect} from 'react';
 import { updateSvgArrows } from './BoardSvg'
-import {Input, Button, List, Icon} from 'rbx';
+import {Input, Button, List, Icon, Divider} from 'rbx';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faTrash} from '@fortawesome/free-solid-svg-icons'
+import {faTrash, faCheckCircle, faAngleDown, faAngleUp} from '@fortawesome/free-solid-svg-icons'
 /**
  * Toolbar to step forward and backward, and switch sides
  */
@@ -257,7 +257,9 @@ const Favorites: React.FC<{}> = () => {
             </List>
             <Input type="text" placeholder="Add position name" value={text} className='favorite-bar'
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value)} />
-        <Button className='favorite-add-btn' onClick={addFavorite}>Add</Button>
+            <Button className='favorite-add-btn' onClick={addFavorite}>
+                <Icon color='primary'><FontAwesomeIcon icon={faCheckCircle}/></Icon>
+            </Button>
     </div>
     );
 };
@@ -295,4 +297,58 @@ const ModeSelector: React.FC<{}> = () => {
     );
 }
 
-export {StepToolbar, Favorites, ModeSelector};
+const SuggestionTools: React.FC<{}> = () => {
+    const {board, setBoard} = useBoardByUrlService();
+    const [show, setShow] = useState<boolean>(false);
+    const [focused, setFocused] = useState<Suggestion | null>(null);
+    let suggestions: Suggestion[];
+    if (board.backStack.length) {
+        suggestions = board.backStack[board.backStack.length - 1].suggestions;
+        if (suggestions && focused) {
+            let found = suggestions.find(s => s === focused);
+            if (! found) {
+                console.log('BOOM REMOVED');
+                setFocused(null);
+            }
+        }
+    }
+
+    const SuggestionList: React.FC<{}> = () => {
+        return (
+            <div>
+                <Button className='suggestion-button' onClick={() => setShow(t => ! t)}>
+                    <span>Arrows</span>
+                    <Icon size="small">
+                        <FontAwesomeIcon icon={show ? faAngleUp : faAngleDown} />
+                    </Icon>
+                </Button>
+                <List className={'suggestion-list'+(show ? '' : '-hidden')}>{suggestions && suggestions.map(s =>
+                    <List.Item key={s.move} className='suggestion-list-item' id={'suggestionList'+s.move} onClick={() => {setFocused(s)}}>
+                        {s.san}
+                        </List.Item>)}
+                    </List>
+                    </div>);
+    };
+
+    const SuggestionMenu: React.FC<{}> = () => {
+        return (focused ? (<div>
+            <Divider>Suggestion arrow</Divider>
+            <h3>{focused.san}</h3>
+            <Button className='suggestion-menu-button'>
+            <Icon color='danger' key='danger' size='small'>
+                <FontAwesomeIcon icon={faTrash} size='xs' />
+            </Icon>
+            <span className='button-spacer'></span>Unlink
+        </Button>
+        </div>) : (<div></div>));
+    };
+
+
+    return (<div>
+        <SuggestionList/>
+        {focused && (<SuggestionMenu/>)}
+
+        </div>);
+};
+
+export {StepToolbar, Favorites, ModeSelector, SuggestionTools};
