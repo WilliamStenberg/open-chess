@@ -1,4 +1,4 @@
-import {GameModel, GameMode, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, Suggestion} from './BoardService';
+import {GameModel, GameMode, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, StepBackResponse, AnalysisResponse} from './BoardService';
 import React, {useState, useEffect} from 'react';
 import { updateSvgArrows } from './BoardSvg'
 import {Input, Button, List, Icon} from 'rbx';
@@ -10,16 +10,22 @@ import { faTrash} from '@fortawesome/free-solid-svg-icons'
 const StepToolbar: React.FC<{}> = () => {
     const {board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
     const stepBack = () => {
-        doFetch('back', {practise: board.gameMode === GameMode.Practise}, (resp: IMoveResponse) => {
+        let plies = board.gameMode === GameMode.Explore ? 1 : 2;
+        doFetch('back', {plies: plies}, (resp: StepBackResponse) => {
             if (board.backStack.length) {
                 setBoard(((b: Board) => {
-                    let latest = b.backStack[b.backStack.length - 1];
-                    executeFetchUpdates(b, latest.revert);
-                    b.backStack.pop();
-                    b.forwardStack.push(latest);
-                    let previous = b.backStack[b.backStack.length - 1];
-                    if (previous && previous.suggestions && board.gameMode === GameMode.Explore) {
-                        updateSvgArrows(b, previous.suggestions);
+                    let latest;
+                    for (let i = 0; i < plies; ++i) {
+                        latest = b.backStack[b.backStack.length - 1];
+                        executeFetchUpdates(b, latest.revert);
+                        b.backStack.pop();
+                        b.forwardStack.push(latest);
+                    }
+                    if (b.backStack.length) {
+                        b.backStack[b.backStack.length - 1].suggestions = resp.suggestions;
+                    }
+                    if (board.gameMode === GameMode.Explore) {
+                        updateSvgArrows(b, resp.suggestions);
                     } else {
                         updateSvgArrows(b, []);
                     }
@@ -29,22 +35,31 @@ const StepToolbar: React.FC<{}> = () => {
             } else {
                 console.error('backStack is empty');
             }
-        }, () => {
+        }, (error) => {
             // This fail means no backing possible
-            console.error('Could not back');
+            console.error('Could not back:', error);
         });
     };
 
     const stepForward = () => {
         if (board.forwardStack.length) {
-            let next = board.forwardStack[board.forwardStack.length - 1];
-            next && doFetch('explore/move', {moves: next.moves}, (resp: IMoveResponse) => {
+            let forwardMoves = [board.forwardStack[board.forwardStack.length - 1]];
+            console.log('will send do forward', forwardMoves);
+            if (board.gameMode === GameMode.Practise && board.forwardStack.length >= 2) {
+                forwardMoves = forwardMoves.concat(
+                    board.forwardStack[board.forwardStack.length - 2]);
+            }
+            let forwardMoveUcis = forwardMoves.map(fm => fm.move);
+
+            doFetch('forward', {moves: forwardMoveUcis}, (resp: IMoveResponse) => {
                 setBoard(((b: Board) => {
-                    executeFetchUpdates(b, resp.updates);
-                    b.forwardStack.pop();
-                    b.backStack.push(resp);
+                    resp.moves.forEach(revMove => {
+                        executeFetchUpdates(b, revMove.updates);
+                        b.forwardStack.pop();
+                        b.backStack.push(revMove);
+                    });
                     if (b.gameMode === GameMode.Explore) {
-                        updateSvgArrows(b, resp.suggestions);
+                        updateSvgArrows(b, resp.moves[resp.moves.length - 1].suggestions);
                     } else {
                         updateSvgArrows(b, []);
                     }
@@ -141,7 +156,7 @@ const StepToolbar: React.FC<{}> = () => {
     }
 
     const promptAnalysis = () => {
-        doFetch('analyse', {}, (resp: IMoveResponse) => {
+        doFetch('analyse', {}, (resp: AnalysisResponse) => {
             setBoard(((b: Board) => {
                 updateSvgArrows(b, resp.suggestions);
                 return b;
@@ -185,16 +200,18 @@ const Favorites: React.FC<{}> = () => {
     const loadFavorite = (favoriteName: string) => {
         doFetch('favorites/load', {name: favoriteName}, (resp: IMoveResponse) => {
             setBoard(((b: Board) => {
-                //resp.revert = resp.revert.reverse();
                 while (b.backStack.length) {
                     let latest = b.backStack[b.backStack.length - 1];
                     executeFetchUpdates(b, latest.revert);
                     b.backStack.pop();
                 }
-                b.backStack = [resp];
-                executeFetchUpdates(b, resp.updates);
+                resp.moves.forEach(m => {
+                    b.backStack = b.backStack.concat(m);
+                    executeFetchUpdates(b, m.updates);
+                });
                 b.forwardStack = [];
-                updateSvgArrows(b, resp.suggestions);
+                let lastPly = b.backStack[b.backStack.length - 1];
+                updateSvgArrows(b, lastPly.suggestions);
                 return b;
             })(board));
         }, (error) => {

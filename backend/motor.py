@@ -22,7 +22,6 @@ def board_step(move_uci: str):
     global b, cursor
     print('Stepping from:')
     print(cursor)
-    print(f'Looking for uci {move_uci}')
     found = False
     for reply in cursor['theory'] + cursor['moves']:
         if reply['uci'] == move_uci:
@@ -84,69 +83,67 @@ def is_good_move(move: str) -> bool:
     return move == best_other_move['uci']
 
 
-def game_move(move: str, ret_dict) -> None:
+def game_move(move: str) -> Dict:
     """
     Updates game state with given move.
     Takes UCI string move and return dictionary
-    to populate with move-related data
+    with the revertible move and its suggestions (after the move is made)
     """
     global b, cursor
-    if 'updates' not in ret_dict:
-        ret_dict['updates'] = list()
-    if 'revert' not in ret_dict:
-        ret_dict['revert'] = list()
-    if 'moves' not in ret_dict:
-        ret_dict['moves'] = list()
-    # TODO extend from legal move to "good move" by Polyglot or Stockfish
+    move_dict = {'updates': [], 'revert': []}
     board_move = chess.Move.from_uci(move)
     start = move[:2]
     end = move[2:]
-    ret_dict['moves'].append(move)
+    move_dict['move'] = move
     if b.is_en_passant(board_move):
         pawn_square = move[2] + str(int(move[3]) + (-1 if b.turn else 1))
-        ret_dict['updates'].append(pawn_square + '??')  # Remove
-        ret_dict['updates'].append(start + end)  # Affirm the requested move
+        move_dict['updates'].append(pawn_square + '??')  # Remove
+        move_dict['updates'].append(start + end)  # Affirm the requested move
         revert_pair = [end + start, '??' + pawn_square]
 
-        ret_dict['revert'] = revert_pair + ret_dict['revert']
+        move_dict['revert'] = revert_pair + move_dict['revert']
 
     elif b.is_kingside_castling(board_move):
-        ret_dict['updates'].append(start + end)
-        ret_dict['updates'].append('h1f1' if b.turn else 'h8f8')
+        move_dict['updates'].append(start + end)
+        move_dict['updates'].append('h1f1' if b.turn else 'h8f8')
         revert_pair = [end + start, 'f1h1' if b.turn else 'f8h8']
-        ret_dict['revert'] = revert_pair + ret_dict['revert']
+        move_dict['revert'] = revert_pair + move_dict['revert']
     elif b.is_queenside_castling(board_move):
-        ret_dict['updates'].append(start + end)
-        ret_dict['updates'].append('a1d1' if b.turn else 'a8d8')
+        move_dict['updates'].append(start + end)
+        move_dict['updates'].append('a1d1' if b.turn else 'a8d8')
         revert_pair = [end + start, 'd1a1' if b.turn else 'd8a8']
-        ret_dict['revert'] = revert_pair + ret_dict['revert']
+        move_dict['revert'] = revert_pair + move_dict['revert']
     else:
         remove = b.piece_at(board_move.to_square)
         if remove:
-            ret_dict['updates'].append(end + '??')
-            ret_dict['updates'].append(start + end)
+            move_dict['updates'].append(end + '??')
+            move_dict['updates'].append(start + end)
             revert_pair = [end + start, '??' + end]
-            ret_dict['revert'] = revert_pair + ret_dict['revert']
+            move_dict['revert'] = revert_pair + move_dict['revert']
         else:
             # Regular move
-            ret_dict['updates'].append(start + end)
-            ret_dict['revert'] = [end + start] + ret_dict['revert']
+            move_dict['updates'].append(start + end)
+            move_dict['revert'] = [end + start] + move_dict['revert']
     board_step(board_move.uci())
+    move_dict['suggestions'] = suggest_moves()
+    return move_dict
 
 
-def push_practise_move(ret_dict: Dict):
+def push_practise_move():
     """
     Have the engine push a known move to the currect game,
     used in practise mode.
     Modifies ret_dict, no return.
     """
+    # TODO: Add settings (which moves to push) as parameters
     global b, cursor
     if not cursor['theory'] and not cursor['moves']:
         trigger_analysis()
+
     candidate_ucis = list(map(
         lambda m: m['uci'],
         cursor['theory'] + cursor['moves']))
-    game_move(random.choice(candidate_ucis), ret_dict)
+    return game_move(random.choice(candidate_ucis))
 
 
 def trigger_analysis():
@@ -165,7 +162,7 @@ def suggest_moves(theory=True, other_moves=True) -> List:
     if not cursor['theory'] and not cursor['moves']:
         analyse_position(cursor, b)
         cursor = db.boards.find_one(
-                {'_id': cursor['_id']})
+            {'_id': cursor['_id']})
     suggested_moves = list()
     if theory:
         for move in cursor['theory']:
@@ -181,14 +178,10 @@ def suggest_moves(theory=True, other_moves=True) -> List:
     return suggested_moves
 
 
-def can_step_back() -> bool:
-    """ Return bool on if there is a move in the move_stack """
+def can_step_back(num_plies: int) -> bool:
+    """ Return bool on if the board can be popped num_plies times """
     global b
-    try:
-        b.peek()
-    except IndexError:
-        return False
-    return True
+    return len(b.move_stack) >= num_plies
 
 
 def step_back():
@@ -226,7 +219,7 @@ def remove_position_as_favorite(name: str) -> bool:
     found = db.favorites.find_one({'name': name})
     if not found:
         return False
-    return db.favorites.delete_one({'name': name}).deleted_count> 0
+    return db.favorites.delete_one({'name': name}).deleted_count > 0
 
 
 def get_favorite_list() -> List:
@@ -246,11 +239,9 @@ def load_favorite_by_name(name: str, ret_dict: Dict):
     while b.move_stack:
         b.pop()
     cursor = db.boards.find_one({'_id': b.fen()})
-    ret_dict['updates'] = []
-    ret_dict['revert'] = []
+    ret_dict['moves'] = []
     for move_uci in favorite_object['uci_stack']:
-        print('abla', move_uci)
-        game_move(move_uci, ret_dict)
+        ret_dict['moves'].append(game_move(move_uci))
 
-    print(ret_dict)
+    print('Loaded', ret_dict)
     return True

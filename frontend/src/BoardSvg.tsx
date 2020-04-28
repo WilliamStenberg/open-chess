@@ -164,17 +164,22 @@ const BoardViewer: React.FC<{}> = () => {
             let move: string = drag.start.squareName() + square;
             GameModel.drag = null;
             let endpoint = board.gameMode + '/move';
-            doFetch(endpoint, {moves: [move]}, (resp: IMoveResponse) => {
+            doFetch(endpoint, {move: move}, (resp: IMoveResponse) => {
                 setBoard(((b: Board)=> {
                     if (! resp.success) {
                         if (drag)
                           drag.piece.placeOn(drag.start);
-                        updateSvgArrows(b, resp.suggestions);
+                        let lastPly = b.backStack[b.backStack.length - 1];
+                        updateSvgArrows(b, lastPly.suggestions);
                     } else {
-                        b.backStack.push(resp);
+                        resp.moves.forEach(move => {
+                            b.backStack.push(move);
+                            executeFetchUpdates(b, move.updates);
+                        });
                         b.forwardStack = [];
-                        executeFetchUpdates(b, resp.updates);
-                        updateSvgArrows(b, board.gameMode === GameMode.Explore ? resp.suggestions : []);
+
+                        let lastPly = b.backStack[b.backStack.length - 1];
+                        updateSvgArrows(b, board.gameMode === GameMode.Explore ? lastPly.suggestions : []);
                     }
                     return b;
                 })(board));

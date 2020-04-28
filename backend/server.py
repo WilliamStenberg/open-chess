@@ -30,7 +30,7 @@ def supply_svg():
     if not request.is_json:
         return jsonify({'err': 'Could not supply SVG: Expected JSON'}), 400
     req_json = request.json
-    if not 'is_white' in req_json:
+    if 'is_white' not in req_json:
         return jsonify({'err': 'Could not supply SVG: No color supplied'}), 400
     svg = motor.get_empty_board(bool(req_json['is_white']))
     return jsonify({'svg': svg}), 200
@@ -42,17 +42,14 @@ def flask_explore_move():
     if not request.is_json:
         return jsonify({'err': 'Could not parse request: Expected JSON'}), 400
     req_json = request.json
-    print('err here', req_json)
-    if 'moves' not in req_json:
+    if 'move' not in req_json:
         return jsonify({'err': 'Could not parse request: No moves'}), 400
 
-    moves = req_json['moves']
+    move = req_json['move']
+    if not motor.is_valid_move(move):
+        return jsonify({'err': 'Not a valid move'}), 402
     ret_dict = {'success': True}
-    for move in moves:
-        if not motor.is_valid_move(move):
-            return jsonify({'err': 'Not a valid move'}), 402
-        motor.game_move(move, ret_dict)
-    ret_dict['suggestions'] = motor.suggest_moves()
+    ret_dict['moves'] = [motor.game_move(move)]
     return jsonify(ret_dict), 200
 
 
@@ -62,20 +59,18 @@ def flask_practise_move():
     if not request.is_json:
         return jsonify({'err': 'Could not parse request: Expected JSON'}), 400
     req_json = request.json
-    if 'moves' not in req_json:
+    if 'move' not in req_json:
         return jsonify({'err': 'Could not parse request: No move'}), 400
-    move = req_json['moves'][0]
+    move = req_json['move']
     if not motor.is_valid_move(move):
         return jsonify({'err': 'Not a valid move'}), 402
 
     if motor.is_good_move(move):
-        ret_dict = {'success': True}
-        motor.game_move(move, ret_dict)
-        motor.push_practise_move(ret_dict)
+        ret_dict = {'success': True, 'moves': []}
+        ret_dict['moves'].append(motor.game_move(move))
+        ret_dict['moves'].append(motor.push_practise_move())
     else:
-        ret_dict = {'success': False, 'updates': []}
-    ret_dict['suggestions'] = motor.suggest_moves()
-    print(ret_dict)
+        ret_dict = {'success': False, 'moves': []}
     return jsonify(ret_dict), 200
 
 
@@ -94,15 +89,37 @@ def flask_step_back():
     Tries to back, returns a ret_dict with most fields empty,
     because the client holds revert information
     """
-    if not motor.can_step_back():
-        return jsonify({'err': 'Cannot step back'}), 402
-
-    motor.step_back()
     req_json = request.json
-    if 'practise' in req_json and req_json['practise']:
-        print('Double back')
+
+    if 'plies' not in req_json:
+        return jsonify({'err': 'No ply count given'}), 400
+    try:
+        plies = int(req_json['plies'])
+    except ValueError:
+        return jsonify({'err': 'Bad ply count given'}), 400
+    if not motor.can_step_back(plies):
+        return jsonify({'err': f'Cannot step {plies} back'}), 402
+    for _ in range(plies):
         motor.step_back()
-    return jsonify({'success': True}), 200
+    ret_dict = {'success': True, 'suggestions': motor.suggest_moves()}
+    return jsonify(ret_dict), 200
+
+
+@app.route('/forward', methods=['POST'])
+def flask_step_forward():
+    """
+    Tries to back, returns a ret_dict with most fields empty,
+    because the client holds revert information
+    """
+    req_json = request.json
+
+    if 'moves' not in req_json:
+        return jsonify({'err': 'No moves given'}), 400
+
+    ret_dict = {'success': True, 'moves': []}
+    for move_uci in req_json['moves']:
+        ret_dict['moves'].append(motor.game_move(move_uci))
+    return jsonify(ret_dict), 200
 
 
 @app.route('/favorites/add', methods=['POST'])
@@ -129,7 +146,7 @@ def flask_remove_favorite():
     if removed:
         return jsonify({'success': True}), 200
     return jsonify({'err': 'Favorite not found'}), 400
-    
+
 
 @app.route('/favorites/list', methods=['POST'])
 def flask_list_favorites():
@@ -152,5 +169,4 @@ def flask_load_favorite():
     success = motor.load_favorite_by_name(name, ret_dict)
     if not success:
         return jsonify({'err': 'Could not load favorite '+name}), 400
-    ret_dict['suggestions'] = motor.suggest_moves()
     return jsonify(ret_dict), 200

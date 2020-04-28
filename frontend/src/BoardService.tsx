@@ -28,17 +28,21 @@ export class TPoint {
 
 export type Suggestion = { move: string, score: number, label: string };
 
+export type RevertibleMove = {
+    move: string, updates: string[],
+    revert: string[], suggestions: Suggestion[]
+};
+
+export type StepBackResponse = {success: boolean; suggestions: Suggestion[]};
+export type AnalysisResponse = StepBackResponse;
+
 /**
  * The response from the server when passing a move
  */
 export interface IMoveResponse {
     success: boolean;
-    moves: string[];
-    suggestions: Suggestion[];
-    updates: string[];
-    revert: string[];
+    moves: RevertibleMove[];
 }
-
 
 export function svgPoint(element: SVGSVGElement, pt: TPoint): TPoint {
 	if (element) {
@@ -198,8 +202,8 @@ export interface Board {
 	svgPoint: any;
 	pieces: Piece[];
 	squares: Square[];
-	backStack: IMoveResponse[];
-	forwardStack: IMoveResponse[];
+	backStack: RevertibleMove[];
+	forwardStack: RevertibleMove[];
     graveyard: Piece[];
     gameMode: GameMode;
 }
