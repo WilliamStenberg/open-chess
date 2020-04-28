@@ -10,9 +10,9 @@ import { faTrash} from '@fortawesome/free-solid-svg-icons'
 const StepToolbar: React.FC<{}> = () => {
     const {board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
     const stepBack = () => {
-        let plies = board.gameMode === GameMode.Explore ? 1 : 2;
-        doFetch('back', {plies: plies}, (resp: StepBackResponse) => {
-            if (board.backStack.length) {
+        if (board.backStack.length) {
+            let plies = board.gameMode === GameMode.Explore ? 1 : 2;
+            doFetch('back', {plies: plies}, (resp: StepBackResponse) => {
                 setBoard(((b: Board) => {
                     let latest;
                     for (let i = 0; i < plies; ++i) {
@@ -32,19 +32,19 @@ const StepToolbar: React.FC<{}> = () => {
                     return b;
                 })(board));
 
-            } else {
-                console.error('backStack is empty');
-            }
-        }, (error) => {
-            // This fail means no backing possible
-            console.error('Could not back:', error);
-        });
+
+            }, (error) => {
+                // This fail means no backing possible
+                console.error('Could not back:', error);
+            });
+        } else {
+            console.error('backStack is empty');
+        }
     };
 
     const stepForward = () => {
         if (board.forwardStack.length) {
             let forwardMoves = [board.forwardStack[board.forwardStack.length - 1]];
-            console.log('will send do forward', forwardMoves);
             if (board.gameMode === GameMode.Practise && board.forwardStack.length >= 2) {
                 forwardMoves = forwardMoves.concat(
                     board.forwardStack[board.forwardStack.length - 2]);
@@ -211,7 +211,11 @@ const Favorites: React.FC<{}> = () => {
                 });
                 b.forwardStack = [];
                 let lastPly = b.backStack[b.backStack.length - 1];
-                updateSvgArrows(b, lastPly.suggestions);
+                if (lastPly) {
+                    updateSvgArrows(b, lastPly.suggestions);
+                } else {
+                    updateSvgArrows(b, []);
+                }
                 return b;
             })(board));
         }, (error) => {

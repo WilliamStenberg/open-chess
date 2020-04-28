@@ -125,7 +125,7 @@ def game_move(move: str) -> Dict:
             move_dict['updates'].append(start + end)
             move_dict['revert'] = [end + start] + move_dict['revert']
     board_step(board_move.uci())
-    move_dict['suggestions'] = suggest_moves()
+    move_dict['suggestions'] = [] if b.is_game_over() else suggest_moves()
     return move_dict
 
 
