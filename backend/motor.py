@@ -10,60 +10,69 @@ import chess.polyglot
 import chess.svg
 from chess import Board
 
-from backend.database import db, analyse_position, unlink_move
+import backend.database as database
+
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
 
 b: Board = Board()
-cursor = db.boards.find_one({'_id': b.fen()})
+cursor = database.find_cursor(b.fen())
 
 
 def board_step(move_uci: str):
     """ Updates board and cursor to step by given UCI """
-    global b, cursor
+    global cursor
     print('Stepping from:')
     print(cursor)
     found = False
     for reply in cursor['theory'] + cursor['moves']:
         if reply['uci'] == move_uci:
             old_cursor = cursor.copy()
-            cursor = db.boards.find_one({'_id': reply['leads_to']})
+            cursor = database.find_cursor(reply['leads_to'])
             if cursor is None or \
                'score' not in cursor or \
                cursor['score'] is None:
                 print('The move is known, but not evaluated')
-                analyse_position(old_cursor, b,
-                                 [chess.Move.from_uci(move_uci)])
-                cursor = db.boards.find_one({'_id': reply['leads_to']})
+                database.analyse_position(old_cursor, b,
+                                          [chess.Move.from_uci(move_uci)])
+                cursor = database.find_cursor(reply['leads_to'])
             b.push_uci(reply['uci'])
             found = True
             break
     if not found:
         print('Want to analyse this new move,', move_uci)
-        analyse_position(cursor, b, [chess.Move.from_uci(move_uci)])
+        database.analyse_position(cursor, b, [chess.Move.from_uci(move_uci)])
         b.push_uci(move_uci)
-        cursor = db.boards.find_one({'_id': b.fen()})
+        cursor = database.find_cursor(b.fen())
 
 
 def get_empty_board(is_white: bool) -> chess.Board:
     """ Return a starting SVG board """
     global b, cursor
     b = chess.Board()
-    cursor = db.boards.find_one({'_id': b.fen()})
+    cursor = database.find_cursor(b.fen())
     print('Empty board setting')
     return chess.svg.board(board=b, flipped=not is_white)
 
 
-def is_valid_move(move: str) -> bool:
-    """ Tests move uci string for legality in game or as special-command """
-    global b
-    # TODO handle special requests such as 'pop'
-    if len(move) != 4 or '?' in move:
-        return False
+def is_valid_move(move_uci: str) -> bool:
+    """ Tests move uci string for legality in game """
     try:
-        m = chess.Move.from_uci(move)
+        move = chess.Move.from_uci(move_uci)
     except ValueError:
         return False
-    return m in b.legal_moves
+    return move in b.legal_moves
+
+
+def promote_uci(move_uci: str) -> str:
+    """
+    Tries to extend move uci to a promotion version,
+    falls back to given move: a7a8 becomes a7a8q,
+    always queening.
+    """
+    promoted_uci = move_uci+'q'
+    if is_valid_move(promoted_uci):
+        return promoted_uci
+    return move_uci
 
 
 def is_good_move(move: str) -> bool:
@@ -72,7 +81,6 @@ def is_good_move(move: str) -> bool:
     available theory and the move is the best of the
     known moves. An unknown move can never be good.
     """
-    global cursor
     if cursor['theory']:
         return move in map(lambda m: m['uci'], cursor['theory'])
     if not cursor['moves']:
@@ -89,7 +97,6 @@ def game_move(move: str) -> Dict:
     Takes UCI string move and return dictionary
     with the revertible move and its suggestions (after the move is made)
     """
-    global b, cursor
     move_dict = {'updates': [], 'revert': []}
     board_move = chess.Move.from_uci(move)
     start = move[:2]
@@ -131,12 +138,10 @@ def game_move(move: str) -> Dict:
 
 def push_practise_move():
     """
-    Have the engine push a known move to the currect game,
-    used in practise mode.
-    Modifies ret_dict, no return.
+    Have the engine push a known move to the current game.
+    Used in practise mode. Returns move_dict from game_move()
     """
     # TODO: Add settings (which moves to push) as parameters
-    global b, cursor
     if not cursor['theory'] and not cursor['moves']:
         trigger_analysis()
 
@@ -147,10 +152,10 @@ def push_practise_move():
 
 
 def trigger_analysis():
-    """ Trigger a longer analysis """
-    global b, cursor
-    analyse_position(cursor, b, extended=True)
-    cursor = db.boards.find_one({'_id': cursor['_id']})
+    """ Trigger a longer analysis, update cursor """
+    global cursor
+    database.analyse_position(cursor, b, extended=True)
+    cursor = database.refresh_cursor(cursor)
 
 
 def suggest_moves(theory=True, other_moves=True) -> List:
@@ -158,11 +163,10 @@ def suggest_moves(theory=True, other_moves=True) -> List:
     Returns all possible book responses to current position
     Returns list of (UCI, score) tuples
     """
-    global b, cursor
+    global cursor
     if not cursor['theory'] and not cursor['moves']:
-        analyse_position(cursor, b)
-        cursor = db.boards.find_one(
-            {'_id': cursor['_id']})
+        database.analyse_position(cursor, b)
+        cursor = database.refresh_cursor(cursor)
     suggested_moves = list()
     if theory:
         for move in cursor['theory']:
@@ -182,51 +186,19 @@ def suggest_moves(theory=True, other_moves=True) -> List:
 
 def can_step_back(num_plies: int) -> bool:
     """ Return bool on if the board can be popped num_plies times """
-    global b
     return len(b.move_stack) >= num_plies
 
 
 def step_back():
     """ Pops the Board stack and updates cursor """
-    global b, cursor
+    global cursor
     b.pop()
-    cursor = db.boards.find_one({'_id': b.fen()})
+    cursor = database.find_cursor(b.fen())
 
 
 def add_position_as_favorite(name: str) -> bool:
-    """
-    Insert board as favorite if name and FEN does not exist in DB,
-    also registers move stack to replicate move-by-move.
-    Returns success boolean
-    """
-    global b
-    found = db.favorites.find_one({'name': name})
-    if found:
-        return None
-    found = db.favorites.find_one({'fen': b.fen()})
-    if found:
-        return None
-    favorite_object = {
-        'name': name,
-        'fen': b.fen(),
-        'uci_stack': [m.uci() for m in b.move_stack]
-    }
-    db.favorites.insert_one(favorite_object)
-    return True
-
-
-def remove_position_as_favorite(name: str) -> bool:
-    """ Removes a favorite object by name """
-
-    found = db.favorites.find_one({'name': name})
-    if not found:
-        return False
-    return db.favorites.delete_one({'name': name}).deleted_count > 0
-
-
-def get_favorite_list() -> List:
-    """ Fetch all favorites from DB """
-    return list(map(lambda x: x['name'], db.favorites.find({})))
+    """ Adds currect position to favorites """
+    return database.add_favorite(name, b)
 
 
 def load_favorite_by_name(name: str, ret_dict: Dict):
@@ -234,13 +206,13 @@ def load_favorite_by_name(name: str, ret_dict: Dict):
     Resets board and steps through a favorite move stack,
     Populates ret_dict. Returns success boolean.
     """
-    global b, cursor
-    favorite_object = db.favorites.find_one({'name': name})
+    global cursor
+    favorite_object = database.find_favorite(name)
     if not favorite_object:
         return False
     while b.move_stack:
         b.pop()
-    cursor = db.boards.find_one({'_id': b.fen()})
+    cursor = database.find_cursor(b.fen())  # Reset board cursor
     ret_dict['moves'] = []
     for move_uci in favorite_object['uci_stack']:
         ret_dict['moves'].append(game_move(move_uci))
@@ -255,6 +227,6 @@ def game_unlink_move(move_uci: str) -> bool:
     updates cursor and returns succes status
     """
     global cursor
-    success = unlink_move(cursor['_id'], move_uci)
-    cursor = db.boards.find_one({'_id': cursor['_id']})
+    success = database.unlink_move(cursor['_id'], move_uci)
+    cursor = database.refresh_cursor(cursor)
     return success

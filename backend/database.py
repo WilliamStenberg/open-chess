@@ -2,11 +2,11 @@
 database.py
 Handles Mongo DB for open-chess
 """
+from typing import List, Dict
 import chess.engine
 import chess.pgn
 import chess.polyglot
 from chess.pgn import Game
-from typing import Dict
 import pymongo
 import bson
 
@@ -16,6 +16,57 @@ db = conn.chessdb
 MAX_DEPTH = 25
 
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
+
+
+def find_cursor(board_fen: str):
+    """ Searches database for board with given FEN, returns cursor """
+    return db.boards.find_one({'_id': board_fen})
+
+
+def refresh_cursor(cursor):
+    """ Finds the same cursor, giving the newest version """
+    return find_cursor(cursor['_id'])
+
+
+def find_favorite(name=None, board_fen=None):
+    """
+    Find favorite by either name or board FEN.
+    Will try name first and returns on find, otherwise tries FEN before None
+    """
+    if name:
+        found = db.favorites.find_one({'name': name})
+        if found:
+            return found
+    elif board_fen:
+        found = db.favorites.find_one({'fen': board_fen})
+        if found:
+            return found
+    return None
+
+
+def add_favorite(name: str, board: chess.Board) -> bool:
+    """ Adds favorite, performs exist check first """
+    if not name or find_favorite(name, board.fen()):
+        return False
+    favorite_object = {
+        'name': name,
+        'fen': board.fen(),
+        'uci_stack': [m.uci() for m in board.move_stack]
+    }
+    db.favorites.insert_one(favorite_object)
+    return True
+
+
+def remove_favorite(name: str) -> bool:
+    """ Finds a favorite by name and deletes it """
+    if not find_favorite(name):
+        return False
+    return db.favorites.delete_one({'name': name}).deleted_count > 0
+
+
+def list_favorites() -> List[str]:
+    """ Fetch all favorites from DB and return their names """
+    return list(map(lambda x: x['name'], db.favorites.find({})))
 
 
 def insert_board(board_fen: str, theory=None, other_moves=None,
