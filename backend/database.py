@@ -56,6 +56,20 @@ def insert_board(board_fen: str, theory=None, other_moves=None,
     return bool(db.boards.insert_one(db_board))
 
 
+def unlink_move(board_fen: str, move_uci: str) -> bool:
+    """
+    Shallow remove of a move from either theory or moves on a board by FEN
+    returns success status.
+    """
+    theory_result = db.boards.update_one({'_id': board_fen}, {
+        '$pull': {'theory': {'uci': move_uci}}})
+    if theory_result.modified_count > 0:
+        return True
+    moves_result = db.boards.update_one({'_id': board_fen}, {
+        '$pull': {'moves': {'uci': move_uci}}})
+    return moves_result.modified_count > 0
+
+
 def read_polyglot_file(bin_file_name, uci_moves=None):
     """
     Read a Polyglot-compatible game file, starting with a set

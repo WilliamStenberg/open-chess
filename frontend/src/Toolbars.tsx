@@ -298,7 +298,7 @@ const ModeSelector: React.FC<{}> = () => {
 }
 
 const SuggestionTools: React.FC<{}> = () => {
-    const {board, setBoard} = useBoardByUrlService();
+    const {board, setBoard, doFetch} = useBoardByUrlService();
     const [show, setShow] = useState<boolean>(false);
     const [focused, setFocused] = useState<Suggestion | null>(null);
     let suggestions: Suggestion[];
@@ -307,7 +307,6 @@ const SuggestionTools: React.FC<{}> = () => {
         if (suggestions && focused) {
             let found = suggestions.find(s => s === focused);
             if (! found) {
-                console.log('BOOM REMOVED');
                 setFocused(null);
             }
         }
@@ -323,18 +322,30 @@ const SuggestionTools: React.FC<{}> = () => {
                     </Icon>
                 </Button>
                 <List className={'suggestion-list'+(show ? '' : '-hidden')}>{suggestions && suggestions.map(s =>
-                    <List.Item key={s.move} className='suggestion-list-item' id={'suggestionList'+s.move} onClick={() => {setFocused(s)}}>
+                    <List.Item key={s.move} className='suggestion-list-item' id={'suggestionList'+s.move} onClick={() => {setShow(t => ! t); setFocused(s)}}>
                         {s.san}
                         </List.Item>)}
                     </List>
                     </div>);
     };
 
+
     const SuggestionMenu: React.FC<{}> = () => {
+        const unlinkFocusedSuggestion = () => {
+            focused && doFetch('unlink', {move: focused.move}, (resp: AnalysisResponse) => {
+                setBoard(((b: Board) => {
+                    updateSvgArrows(b, resp.suggestions);
+                    setFocused(null);
+                    return b;
+                })(board));
+            }, (error) => {
+                console.error('Bad unlink:', error);
+            });
+        };
         return (focused ? (<div>
             <Divider>Suggestion arrow</Divider>
             <h3>{focused.san}</h3>
-            <Button className='suggestion-menu-button'>
+            <Button className='suggestion-menu-button' id='unlinkButton' onClick={unlinkFocusedSuggestion}>
             <Icon color='danger' key='danger' size='small'>
                 <FontAwesomeIcon icon={faTrash} size='xs' />
             </Icon>

@@ -1,10 +1,11 @@
-
+//https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key/Key_Values
 const keyMap = {
     BACK: 'ArrowLeft',
     FORWARD: 'ArrowRight',
     FLIP: 'f',
     EXPLORE: 'e',
-    PRACTISE: 'p'
+    PRACTISE: 'p',
+    UNLINK: ['Delete', 'Backspace', 'u'],
 };
 
 const keyHandlers = {
@@ -29,6 +30,12 @@ const keyHandlers = {
         let btn = document.getElementById('practiseItem');
         btn && btn.click();
     },
+    UNLINK: (_?: KeyboardEvent) => {
+        let btn = document.getElementById('unlinkButton');
+        btn && btn.click();
+    },
+
+
 
 
 

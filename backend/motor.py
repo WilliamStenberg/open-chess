@@ -10,7 +10,7 @@ import chess.polyglot
 import chess.svg
 from chess import Board
 
-from backend.database import db, analyse_position
+from backend.database import db, analyse_position, unlink_move
 engine = chess.engine.SimpleEngine.popen_uci('/usr/bin/stockfish')
 
 b: Board = Board()
@@ -247,3 +247,14 @@ def load_favorite_by_name(name: str, ret_dict: Dict):
 
     print('Loaded', ret_dict)
     return True
+
+
+def game_unlink_move(move_uci: str) -> bool:
+    """
+    Calls unlinking of a move on current cursor in DB,
+    updates cursor and returns succes status
+    """
+    global cursor
+    success = unlink_move(cursor['_id'], move_uci)
+    cursor = db.boards.find_one({'_id': cursor['_id']})
+    return success

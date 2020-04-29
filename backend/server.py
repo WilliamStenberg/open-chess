@@ -170,3 +170,19 @@ def flask_load_favorite():
     if not success:
         return jsonify({'err': 'Could not load favorite '+name}), 400
     return jsonify(ret_dict), 200
+
+
+@app.route('/unlink', methods=['POST'])
+def flask_unlink_suggestion():
+    """
+    Attempts to unlink the suggestion uci given
+    """
+    req_json = request.json
+    if 'move' not in req_json:
+        return jsonify({'err': 'No move given to unlink'}), 400
+    if not motor.is_valid_move(req_json['move']):
+        return jsonify({'err': 'Invalid move given to unlink'}), 400
+    if not motor.game_unlink_move(req_json['move']):
+        return jsonify({'err': 'Server could not unlink move'}), 400
+    ret_dict = {'success': True, 'suggestions': motor.suggest_moves()}
+    return jsonify(ret_dict), 200
