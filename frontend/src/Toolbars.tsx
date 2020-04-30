@@ -1,9 +1,12 @@
-import {GameModel, GameMode, useBoardByUrlService, Board, IMoveResponse, svgPoint, StringDict, StepBackResponse, AnalysisResponse, Suggestion} from './BoardService';
+import {GameMode, useBoardByUrlService, Board, IMoveResponse, StringDict, StepBackResponse, AnalysisResponse, Suggestion} from './BoardService';
+import {GameModel} from './Models';
 import React, {useState, useEffect} from 'react';
-import { updateSvgArrows } from './BoardSvg'
+import {updateSvgArrows} from './Arrows';
+import {svgPoint} from './BoardSvg'
 import {Input, Button, List, Icon, Divider} from 'rbx';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {FontAwesomeIcon} from '@fortawesome/react-fontawesome'
 import {faTrash, faCheckCircle, faAngleDown, faAngleUp} from '@fortawesome/free-solid-svg-icons'
+
 /**
  * Toolbar to step forward and backward, and switch sides
  */
@@ -354,12 +357,11 @@ const SuggestionTools: React.FC<{}> = () => {
         </div>) : (<div></div>));
     };
 
-
     return (<div>
-        <SuggestionList/>
-        {focused && (<SuggestionMenu/>)}
-
-        </div>);
+        {board.gameMode === GameMode.Explore && (
+            <div><SuggestionList/>
+                {focused && (<SuggestionMenu/>)}
+                </div>)}</div>);
 };
 
 export {StepToolbar, Favorites, ModeSelector, SuggestionTools};

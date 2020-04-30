@@ -34,12 +34,6 @@ const keyHandlers = {
         let btn = document.getElementById('unlinkButton');
         btn && btn.click();
     },
-
-
-
-
-
-
 };
 
 export {keyMap, keyHandlers};
