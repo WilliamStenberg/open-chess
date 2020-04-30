@@ -37,7 +37,7 @@ const BoardViewer: React.FC<{}> = () => {
     /**
      * SVG transformations when dragging a piece on the board
      */
-    const onBoardMouseMove = (square: Square, evt: Event) => {
+    const onBoardMouseMove = (evt: Event) => {
         if (GameModel.drag && board.svg) {
             let m = (evt as unknown) as React.MouseEvent;
             let piece = GameModel.drag.piece;
@@ -117,20 +117,20 @@ const BoardViewer: React.FC<{}> = () => {
                 let pieces: Piece[] = [];
                 let defs: HTMLElement = givenSvg;
                 let others: HTMLElement[] = [];
+                Piece.onMouseDown = onPieceMouseDown;
+                Piece.onMouseMove = onBoardMouseMove;
+                Piece.onMouseUp = onBoardMouseUp;
+                Square.onMouseMove = onBoardMouseMove;
                 tags.forEach((value: Node, key, parent) => {
                     let elem = value as HTMLElement;
                     if (value.nodeName === 'rect') {
                         let squareName = elem.classList[elem.classList.length - 1];
                         let square = new Square(elem, squareName);
                         if (value.nextSibling && value.nextSibling.nodeName === 'use') {
-                            let pc = new Piece(value.nextSibling as HTMLElement, 'piece', square);
-                            pc.registerMouseHandlers(onPieceMouseDown, onBoardMouseUp, onBoardMouseMove);
+                            let pc = new Piece(value.nextSibling as HTMLElement, square);
                             pieces = pieces.concat(pc);
                         }
-                        square.registerMouseHandlers(() => {
-                        }, () => {
-                        },
-                            onBoardMouseMove);
+
                         squares = squares.concat(square);
 
                     } else if (value.nodeName === 'defs') {

@@ -71,7 +71,7 @@ const executeFetchUpdates = (board: Board, commands: string[]) => {
             // Fetch the object from the remove queue
             if (board.graveyard.length) {
                 let piece = board.graveyard.pop();
-                let square = board.squares.find((p: Piece) => p.square === end);
+                let square = board.squares.find(p => p.square === end);
 
                 if (piece && square) {
                     piece.placeOn(square);
@@ -82,16 +82,39 @@ const executeFetchUpdates = (board: Board, commands: string[]) => {
                 console.error('Graveyard empty!');
             }
         } else if (end === '??') {
-            let p = board.pieces.find((p: Piece) => p.isOnBoard() && p.squareName() === start);
+            let p = board.pieces.find(p => p.isOnBoard() && p.squareName() === start);
             if (p) {
                 board.graveyard.push(p);
                 p.remove();
             } else {
                 console.error('malformed command?', move);
             }
+        } else if (start.toLowerCase() === 'qq') { // Copy queen, QQ for white
+            let color = start === 'qq' ? 'black' : 'white';
+            let p = board.pieces.find(p => p.pieceType === color + '-queen');
+            let square = board.squares.find(p => p.square === end);
+            if (p && board.svg && square) {
+                let newDomQueen = p.domPiece.cloneNode(true); // deep copy
+                board.svg.insertBefore(newDomQueen, p.domPiece);
+                let newQueen = new Piece(newDomQueen as HTMLElement, square);
+
+                board.pieces = board.pieces.concat(newQueen);
+            } else {
+                console.error('Could not copy queen!');
+            }
+        } else if (end === 'xx') { // Destroy a piece, used when backing a queening
+            let p = board.pieces.find(p => p.isOnBoard() && p.squareName() === start);
+            if (p) {
+                p.domPiece.remove();
+                let index = board.pieces.indexOf(p, 0);
+                board.pieces.splice(index, 1);
+            } else {
+                console.error('Could not find piece to destroy');
+            }
+            
         } else { // Moving pieces
-            let piece = board.pieces.find((p: Piece) => p.isOnBoard() && p.squareName() === start);
-            let targetSquare = board.squares.find((p: Piece) => p.squareName() === end);
+            let piece = board.pieces.find(p => p.isOnBoard() && p.squareName() === start);
+            let targetSquare = board.squares.find(p => p.squareName() === end);
 
             piece && targetSquare && piece.placeOn(targetSquare);
         }

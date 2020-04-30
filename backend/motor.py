@@ -100,33 +100,35 @@ def game_move(move: str) -> Dict:
     move_dict = {'updates': [], 'revert': []}
     board_move = chess.Move.from_uci(move)
     start = move[:2]
-    end = move[2:]
+    end = move[2:4]  # since a queening move has 5 characters
+    is_promotion = len(move) == 5
     move_dict['move'] = move
     if b.is_en_passant(board_move):
         pawn_square = move[2] + str(int(move[3]) + (-1 if b.turn else 1))
-        move_dict['updates'].append(pawn_square + '??')  # Remove
-        move_dict['updates'].append(start + end)  # Affirm the requested move
+        update_pair = [pawn_square + '??', start + end]
+        move_dict['updates'] = update_pair
         revert_pair = [end + start, '??' + pawn_square]
-
-        move_dict['revert'] = revert_pair + move_dict['revert']
-
+        move_dict['revert'] = revert_pair
     elif b.is_kingside_castling(board_move):
-        move_dict['updates'].append(start + end)
+        move_dict['updates'] = [start + end]
         move_dict['updates'].append('h1f1' if b.turn else 'h8f8')
         revert_pair = [end + start, 'f1h1' if b.turn else 'f8h8']
-        move_dict['revert'] = revert_pair + move_dict['revert']
+        move_dict['revert'] = revert_pair
     elif b.is_queenside_castling(board_move):
-        move_dict['updates'].append(start + end)
+        move_dict['updates'] = [start + end]
         move_dict['updates'].append('a1d1' if b.turn else 'a8d8')
         revert_pair = [end + start, 'd1a1' if b.turn else 'd8a8']
-        move_dict['revert'] = revert_pair + move_dict['revert']
+        move_dict['revert'] = revert_pair
     else:
         remove = b.piece_at(board_move.to_square)
         if remove:
-            move_dict['updates'].append(end + '??')
-            move_dict['updates'].append(start + end)
-            revert_pair = [end + start, '??' + end]
-            move_dict['revert'] = revert_pair + move_dict['revert']
+            move_dict['updates'] = [end + '??']
+            move_dict['revert'] = ['??' + end]
+        if is_promotion:
+            move_dict['updates'].append(start + '??')
+            move_dict['updates'].append('QQ' + end if b.turn else 'qq' + end)
+            revert_queen = [end + 'xx', '??' + start]
+            move_dict['revert'] = revert_queen + move_dict['revert']
         else:
             # Regular move
             move_dict['updates'].append(start + end)

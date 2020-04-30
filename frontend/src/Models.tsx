@@ -39,10 +39,6 @@ export abstract class GameModel {
 
 	}
 
-	public abstract registerMouseHandlers(mouseDown?: (pc: Piece, evt: Event) => void,
-	                                      mouseUp?: (pc: Square, evt: Event) => void,
-	                                      mouseMove?: (pc: Square, evt: Event) => void): void;
-
 	public squareName(): string {
 		return this.square;
 	}
@@ -55,23 +51,11 @@ export abstract class GameModel {
 }
 
 export class Square extends GameModel {
+    static onMouseMove: (evt: Event) => void = (evt) => {};
+
 	constructor(domPiece: HTMLElement, square: string) {
 		super(domPiece, square);
-	}
-
-	registerMouseHandlers(mouseDown: (pc: Piece, evt: Event) => void,
-	                      mouseUp?: (pc: Square, evt: Event) => void,
-	                      mouseMove?: (pc: Square, evt: Event) => void): void {
-		if (mouseUp) {
-			this.domPiece.onmouseup = (evt: Event) => {
-				mouseUp(this, evt)
-			};
-		}
-		if (mouseMove) {
-			this.domPiece.onmousemove = (evt: Event) => {
-				mouseMove(this, evt)
-			};
-		}
+        this.domPiece.onmousemove = Square.onMouseMove;
 	}
 
 	public getPosition(): TPoint {
@@ -81,41 +65,37 @@ export class Square extends GameModel {
 }
 
 export class Piece extends GameModel {
-	private pieceType: string;
+	pieceType: string;
 	onBoard: boolean = true;
-	occupying: Square;
+    occupying: Square;
+    static onMouseDown: (pc: Piece, evt: Event) => void = (pc, evt) => {};
+    static onMouseMove: (evt: Event) => void = (evt) => {};
+    static onMouseUp: (pc: Piece, evt: Event) => void = (pc, evt) => {};
 
-	constructor(domPiece: HTMLElement, type: string, square: Square) {
+	constructor(domPiece: HTMLElement, square: Square) {
 		super(domPiece, square.squareName());
-		this.pieceType = type;
 		this.occupying = square;
+        let pieceAttr = domPiece.attributes.getNamedItem('xlink:href');
+        // Substring eliminates octothorpe in piece type given by SVG
+        this.pieceType = pieceAttr ? pieceAttr.value.substring(1)  : '';
+        this.registerMouseHandlers();
 	}
 
 	isOnBoard(): boolean {
 		return this.onBoard;
 	}
 
-	public registerMouseHandlers(mouseDown?: (pc: Piece, evt: Event) => void,
-	                             mouseUp?: (pc: Square, evt: Event) => void,
-	                             mouseMove?: (pc: Square, evt: Event) => void): void {
-		if (mouseDown) {
-			this.domPiece.onmousedown = (evt: Event) => {
-				mouseDown(this, evt)
-			};
-		}
+    private registerMouseHandlers(): void {
+        this.domPiece.onmousedown = (evt: Event) => {
+            Piece.onMouseDown(this, evt)
+        };
 
-		if (mouseMove) {
-			this.domPiece.onmousemove = (evt: Event) => {
-				mouseMove(this, evt)
-			};
-		}
+        this.domPiece.onmousemove = Piece.onMouseMove;
 
-		if (mouseUp) {
-			this.domPiece.onmouseup = (evt: Event) => {
-				mouseUp(this, evt)
-			};
-		}
-	}
+        this.domPiece.onmouseup = (evt: Event) => {
+            Piece.onMouseUp(this, evt)
+        };
+    }
 
 	public moveTo(newPosition: TPoint) {
 		this.domPiece.setAttribute('transform',
