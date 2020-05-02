@@ -199,3 +199,16 @@ def flask_unlink_suggestion():
         return json_fail('Server could not unlink move')
     ret_dict = {'success': True, 'suggestions': motor.suggest_moves()}
     return json_ok(ret_dict)
+
+
+@app.route('/practise/swap', methods=['POST'])
+def flask_swap():
+    """
+    Pops the most recent moves and chooses another as a computer move
+    """
+    req_json = request.json
+    if 'reject' not in req_json:
+        return json_fail('No reject boolean given')
+    reject = bool(req_json['reject'])
+    move_dict = motor.swap_move(reject)
+    return json_ok({'success': True, 'moves': [move_dict]})

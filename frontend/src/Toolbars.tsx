@@ -5,7 +5,7 @@ import {updateSvgArrows} from './Arrows';
 import {svgPoint} from './BoardSvg'
 import {Input, Button, List, Icon, Divider} from 'rbx';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome'
-import {faTrash, faCheckCircle, faAngleDown, faAngleUp} from '@fortawesome/free-solid-svg-icons'
+import {faTrash, faCheckCircle, faAngleDown, faAngleUp, faBan, faSync} from '@fortawesome/free-solid-svg-icons'
 
 /**
  * Toolbar to step forward and backward, and switch sides
@@ -364,4 +364,47 @@ const SuggestionTools: React.FC<{}> = () => {
                 </div>)}</div>);
 };
 
-export {StepToolbar, Favorites, ModeSelector, SuggestionTools};
+const PractiseTools: React.FC<{}> = () => {
+    const {board, setBoard, doFetch, executeFetchUpdates} = useBoardByUrlService();
+
+    const swapComputerMove = (reject: boolean) => {
+        if (board.gameMode === GameMode.Practise && board.backStack.length) {
+            doFetch('practise/swap', {reject: reject}, (resp: IMoveResponse) => {
+                setBoard(((b: Board) => {
+                    b.forwardStack = [];
+                    let latest = b.backStack[b.backStack.length - 1];
+                    executeFetchUpdates(b, latest.revert);
+                    b.backStack.pop();
+                    resp.moves.forEach(revMove => {
+                        executeFetchUpdates(b, revMove.updates);
+                        b.backStack.push(revMove);
+                    });
+                    return b;
+                })(board));
+            }, (error) => {
+                console.error('Bad move swap:', error);
+            });
+        }
+    };
+    
+    return (<div>
+        {board.gameMode === GameMode.Practise && (
+            <div>
+                <Button className='suggestion-menu-button' id='swapButton' onClick={() => swapComputerMove(false)}>
+                    <Icon color='primary' key='primary' size='small'>
+                        <FontAwesomeIcon icon={faSync} size='xs' />
+                    </Icon>
+                    <span className='button-spacer'></span>Swap
+                </Button>
+                <Button className='suggestion-menu-button' id='rejectButton' onClick={() => swapComputerMove(true)}>
+                    <Icon color='danger' key='danger' size='small'>
+                        <FontAwesomeIcon icon={faBan} size='xs' />
+                    </Icon>
+                    <span className='button-spacer'></span>Reject
+                </Button>
+
+                </div>)}</div>);
+
+};
+
+export {StepToolbar, Favorites, ModeSelector, SuggestionTools, PractiseTools};

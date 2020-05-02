@@ -6,7 +6,7 @@ import BoardViewer from './BoardSvg'
 import {getCookie} from './Cookies'
 import {GlobalHotKeys} from 'react-hotkeys'
 import {keyMap, keyHandlers} from './Shortkeys'
-import {StepToolbar, Favorites, ModeSelector, SuggestionTools} from './Toolbars';
+import {StepToolbar, Favorites, ModeSelector, SuggestionTools, PractiseTools} from './Toolbars';
 import {Column, Box, Divider} from 'rbx';
 
 const MainView: React.FC<{}> = () => {
@@ -26,6 +26,7 @@ const MainView: React.FC<{}> = () => {
                     <Box>
                         <Divider className='detail-divider'>Details</Divider>
                         <SuggestionTools/>
+                        <PractiseTools/>
                     </Box>
                 </Column>
 

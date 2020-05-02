@@ -138,18 +138,24 @@ def game_move(move: str) -> Dict:
     return move_dict
 
 
-def push_practise_move():
+def push_practise_move(exclude_ucis=None):
     """
     Have the engine push a known move to the current game.
     Used in practise mode. Returns move_dict from game_move()
     """
     # TODO: Add settings (which moves to push) as parameters
-    if not cursor['theory'] and not cursor['moves']:
+    candidates = cursor['theory'] + cursor['moves']
+    if not exclude_ucis:
+        exclude_ucis = []
+    candidates = [c for c in candidates if c['uci'] not in exclude_ucis]
+    if not candidates:
         trigger_analysis()
+    candidates = [c for c in cursor['theory'] + cursor['moves']
+                  if c['uci'] not in exclude_ucis]
 
     candidate_ucis = list(map(
         lambda m: m['uci'],
-        cursor['theory'] + cursor['moves']))
+        candidates))
     return game_move(random.choice(candidate_ucis))
 
 
@@ -232,3 +238,16 @@ def game_unlink_move(move_uci: str) -> bool:
     success = database.unlink_move(cursor['_id'], move_uci)
     cursor = database.refresh_cursor(cursor)
     return success
+
+
+def swap_move(do_reject: bool) -> Dict:
+    """
+    Pops a move, unlinks it if signal is given,
+    then pushes another move
+    """
+    global cursor
+    recent_move = b.pop()
+    cursor = database.find_cursor(b.fen())
+    if do_reject:
+        game_unlink_move(recent_move.uci())
+    return push_practise_move([recent_move.uci()])
