@@ -6,6 +6,9 @@ const keyMap = {
     EXPLORE: 'e',
     PRACTISE: 'p',
     UNLINK: ['Delete', 'Backspace', 'u'],
+    ARROWS: 'a',
+    REJECT: 'r',
+    SWAP: 's',
 };
 
 const keyHandlers = {
@@ -32,6 +35,18 @@ const keyHandlers = {
     },
     UNLINK: (_?: KeyboardEvent) => {
         let btn = document.getElementById('unlinkButton');
+        btn && btn.click();
+    },
+    ARROWS: (_?: KeyboardEvent) => {
+        let btn = document.getElementById('arrowsButton');
+        btn && btn.click();
+    },
+    REJECT: (_?: KeyboardEvent) => {
+        let btn = document.getElementById('rejectButton');
+        btn && btn.click();
+    },
+    SWAP: (_?: KeyboardEvent) => {
+        let btn = document.getElementById('swapButton');
         btn && btn.click();
     },
 };

@@ -318,7 +318,7 @@ const SuggestionTools: React.FC<{}> = () => {
     const SuggestionList: React.FC<{}> = () => {
         return (
             <div>
-                <Button className='suggestion-button' onClick={() => setShow(t => ! t)}>
+                <Button id='arrowsButton' className='suggestion-button' onClick={() => setShow(t => ! t)}>
                     <span>Arrows</span>
                     <Icon size="small">
                         <FontAwesomeIcon icon={show ? faAngleUp : faAngleDown} />
