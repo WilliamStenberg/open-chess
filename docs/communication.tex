@@ -1,0 +1,31 @@
+\documentclass[architecture.tex]{subfiles}
+\begin{document}
+The frontend communicates through \lstinline{fetch} calls, making RESTful
+HTTP requests to the backend, typically situated on the same server.
+The Flask server runs from \lstinline{backend/server.py}, where all endpoints
+are defined.
+
+Each call is made through POST, and accepts a dictionary of parameters as input.
+The expected inputs are somewhat standardised e.g. when taking a move as input,
+the endpoints all expect a key named \lstinline{move} containing a four-letter
+move UCI: the square to move from, concatenated with the square to move to.
+
+In the cases with more variation, at this point in time we refer to the
+flask definitions as mentioned.
+
+The backend holds an active board and related context-dependent computations
+in \lstinline{backend/motor.py}. Here, the board is kept as well as a cursor
+to the document in the database that is currently active.
+Hence, the motor can fetch which moves are known (as theory or other moves)
+easily. All interactions with the database are however relegated to
+\lstinline{backend/database.py} where inserting, fetching and removing
+are done, typically returning a document (in the form of cursor) or a
+boolean status.
+
+In addition to the context-holding motor, the \lstinline{backend/utils.py}
+allows a developer to troubleshoot the database, add moves and boards
+from sources such as PGN files or Polyglot files.
+From here a \textit{crawling evaluation} can be started from a given
+position, doing a recursive walk with a maximum depth, evaluating
+every position with Stockfish.
+\end{document}

@@ -1,14 +1,28 @@
 \documentclass[a4paper,11pt,x11 names]{article}
 \usepackage{subfiles}
 \usepackage{chesspreamble}
-\title{Open Chess Software Architecture}
-\newcommand{\documentdate}{2020-04-23}
+\title{Open Chess Software Documentation}
+\newcommand{\documentdate}{2020-05-03}
 \date{\documentdate\\Version 0.2}
 \author{William Stenberg}
 \begin{document}
 \maketitle
-\section*{Introduction}
+\section{Introduction}
 \subfile{intro.tex}
-\section*{Database layout}
+\section{Features}
+\subfile{features.tex}
+\section{Communication}
+\subfile{communication.tex}
+\section{Database layout}
 \subfile{database.tex}
+\newpage
+\begin{thebibliography}{9}
+   \bibitem{ertikz}
+       Claudio Fiandrino, 
+       \textit{Drawing ER diagrams with TikZ}. 
+       \url{https://www.guitex.org/home/images/ArsTeXnica/AT015/drawing-ER-diagrams-with-TikZ.pdf}. Downloaded 2020-05-03.
+\end{thebibliography}
+\addcontentsline{toc}{section}{Referenser}
+
+
 \end{document}

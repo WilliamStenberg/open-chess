@@ -2,15 +2,14 @@
 \begin{document}
 
 \begin{figure}[H]
-\subfile{diagram.tex}
-\caption{Entity-Relationship (ER) diagram for \textit{open-chess} database}
-\label{fig:er-diagram}
+    \subfile{diagram.tex}
+    \caption{Entity-Relationship (ER) diagram for \textit{open-chess} database}
+    \label{fig:er-diagram}
 \end{figure}
 
-The entity-relationship diagram in Figure \ref{fig:er-diagram} outlines the structure of the 
-database, implemented in SQLAlchemy in the backend of \textit{open-chess}.
-The method of drawing the diagram comes from 
-\url{https://www.guitex.org/home/images/ArsTeXnica/AT015/drawing-ER-diagrams-with-TikZ.pdf}.
+The entity-relationship diagram in Figure~\ref{fig:er-diagram} outlines the structure of the 
+database, implemented as MongoDB documents.
+The method of drawing the diagram comes from a paper on TikZ diagrams~\cite{ertikz}.
 Below, each of the elements are explained in terms of their intended
 use in the application:
 
@@ -60,6 +59,4 @@ use in the application:
         and white players and their respective Elo ratings, and the outcome
         of the game as a string out of ``1 - 0'', ``0 - 1'', and ``1/2 - 1/2''.
 \end{itemize}
-
-
 \end{document}
