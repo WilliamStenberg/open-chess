@@ -37,7 +37,7 @@ const updateSvgArrows = (board: Board, suggestions: Suggestion[]) => {
             for (let [, tag] of svg.childNodes.entries()) {
                 if (!found && tag.nodeName === 'use') {
                     found = tag;
-                } else if (tag.nodeName === 'g') {
+                } else if (tag.nodeName === 'g' && (tag as Element).hasAttribute('opacity')) {
                     // Remove 'g' elements containing arrows
                     toBeRemoved = toBeRemoved.concat(tag);
                 }

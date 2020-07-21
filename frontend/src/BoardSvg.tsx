@@ -125,13 +125,14 @@ const BoardViewer: React.FC<{}> = () => {
                     let elem = value as HTMLElement;
                     if (value.nodeName === 'rect') {
                         let squareName = elem.classList[elem.classList.length - 1];
-                        let square = new Square(elem, squareName);
-                        if (value.nextSibling && value.nextSibling.nodeName === 'use') {
-                            let pc = new Piece(value.nextSibling as HTMLElement, square);
-                            pieces = pieces.concat(pc);
+                        if (squareName) {
+                            let square = new Square(elem, squareName);
+                            if (value.nextSibling && value.nextSibling.nodeName === 'use') {
+                                let pc = new Piece(value.nextSibling as HTMLElement, square);
+                                pieces = pieces.concat(pc);
+                            }
+                            squares = squares.concat(square);
                         }
-
-                        squares = squares.concat(square);
 
                     } else if (value.nodeName === 'defs') {
                         defs = elem;

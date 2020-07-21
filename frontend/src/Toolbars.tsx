@@ -82,22 +82,40 @@ const StepToolbar: React.FC<{}> = () => {
         const elemToElemTuple = (e: Element): [Element, number, number] => {
             let x: number = 0;
             let y: number = 0;
-            let xstring = e.getAttribute('x');
+            let transformString = e.getAttribute('transform');
+            if (transformString == null) {
+                transformString = '(0,0)';
+            }
+            let coordString = transformString.split('(')[1].split(')')[0];
+            let [xstring, ystring] = coordString.split(',');
             if (xstring && parseInt(xstring)) {
                 x = parseInt(xstring);
             }
-            let ystring = e.getAttribute('y');
             if (ystring && parseInt(ystring)) {
                 y = parseInt(ystring);
             }
             return [e, x, y];
         }
 
+        const getTransformString = (e: Element, x: string | null, y: string | null): string => {
+            let transformString = e.getAttribute('transform');
+            if (transformString == null) {
+                transformString = 'translate(0, 0);';
+            }
+            let coordString = transformString.split('(')[1].split(')')[0];
+            let [xstring, ystring] = coordString.split(',');
+            let coordEnding = transformString.split(ystring + ')')[1];
+            xstring = (x) ? x : xstring;
+            ystring = (y) ? y : ystring;
+            let result = 'translate('+xstring+','+ystring+')' + coordEnding;
+            return result;
+        }
+
         const flipTextMarks = (b: Board) => {
             if (b.svg) {
                 let allMarks = Array.from(b.svg.childNodes.entries())
                     .map(pair => pair[1] as Element)
-                    .filter(e => e.nodeName === 'text')
+                    .filter(e => e.nodeName === 'g')
                     .map(e => elemToElemTuple(e));
 
                 let [leftX, orderX] = allMarks[0][1] < allMarks[14][1] ? [allMarks[0][1], true] : [allMarks[14][1], false];
@@ -105,16 +123,20 @@ const StepToolbar: React.FC<{}> = () => {
                 let strideX = nextX - leftX;
                 for (let i = 0; i < 16; i += 2) {
                     let newXString = (leftX + ((orderX) ? strideX * (7-(i/2)) : strideX * i/2)).toString();
-                    allMarks[i][0].setAttribute('x', newXString);
-                    allMarks[i+1][0].setAttribute('x', newXString);
+                    allMarks[i][0].setAttribute('transform', getTransformString(
+                                allMarks[i][0], newXString, null));
+                    allMarks[i+1][0].setAttribute('transform', getTransformString(
+                                allMarks[i+1][0], newXString, null));
                 }
                 let [topY, orderY] = allMarks[31][2] > allMarks[16][2] ? [allMarks[31][2], true] : [allMarks[16][2], false];
                 let nextY = allMarks[29][2] > allMarks[18][2] ? allMarks[29][2] : allMarks[18][2];
                 let strideY = topY - nextY;
                 for (let i = 0; i < 16; i += 2) {
                     let newYString = (topY - ((orderY) ? strideY * (i/2) : strideY * (7-i/2))).toString();
-                    allMarks[16+i][0].setAttribute('y', newYString);
-                    allMarks[17+i][0].setAttribute('y', newYString);
+                    allMarks[16+i][0].setAttribute('transform', getTransformString(
+                                allMarks[16+i][0], null, newYString));
+                    allMarks[17+i][0].setAttribute('transform', getTransformString(
+                                allMarks[17+i][0], null, newYString));
                 }
             }
         }
