@@ -8,7 +8,7 @@ import chess.pgn
 import chess.polyglot
 import pymongo
 
-conn = pymongo.MongoClient()
+conn = pymongo.MongoClient(host='mongo', username="root", password="example")
 db = conn.chessdb
 
 MAX_DEPTH = 25

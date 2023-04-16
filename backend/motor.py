@@ -50,6 +50,9 @@ def get_empty_board(is_white: bool) -> chess.Board:
     global b, cursor
     b = chess.Board()
     cursor = database.find_cursor(b.fen())
+    if not cursor:
+        database.insert_board(b.fen(), score=0)
+        cursor = database.find_cursor(b.fen())
     print('Empty board setting')
     return chess.svg.board(board=b, flipped=not is_white)
 

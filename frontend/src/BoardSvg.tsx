@@ -127,13 +127,20 @@ const BoardViewer: React.FC<{}> = () => {
                         let squareName = elem.classList[elem.classList.length - 1];
                         if (squareName) {
                             let square = new Square(elem, squareName);
-                            if (value.nextSibling && value.nextSibling.nodeName === 'use') {
-                                let pc = new Piece(value.nextSibling as HTMLElement, square);
-                                pieces = pieces.concat(pc);
-                            }
                             squares = squares.concat(square);
                         }
 
+                    } else if (value.nodeName === 'use') {
+                        let n = pieces.length;
+                        let square = (n >= 16) ? (
+                            // black piece/pawn
+                            squares[32  + n]
+                        ) : (
+                            // white piece
+                            squares[n]
+                        )
+                        let pc = new Piece(value as HTMLElement, square);
+                        pieces = pieces.concat(pc);
                     } else if (value.nodeName === 'defs') {
                         defs = elem;
                     } else {

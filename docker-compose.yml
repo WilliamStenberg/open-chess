@@ -1,0 +1,44 @@
+version: '3.7'
+
+services:
+  mongo:
+    image: mongo 
+    container_name: chess_mongo
+    restart: always
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - mongo-data:/data/db
+  frontend:
+    build:
+      context: ./
+      dockerfile: ./docker/frontend.Dockerfile
+    stdin_open: true
+    container_name: chess_frontend
+    ports:
+      - 3000:3000
+    depends_on:
+      - backend
+    links:
+      - backend
+
+  backend:
+    build:
+      context: ./
+      dockerfile: ./docker/backend.Dockerfile
+    stdin_open: true
+    container_name: chess_backend
+    ports:
+      - 4999:4999
+    volumes:
+      - .:/workspace:delegated
+    depends_on:
+      - mongo
+    links:
+      - mongo
+
+volumes:
+  mongo-data:
