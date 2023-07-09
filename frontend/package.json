@@ -16,7 +16,7 @@
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-hotkeys": "^2.0.0",
-    "react-scripts": "^3.4.1",
+    "react-scripts": "^5.0.1",
     "reactn": "^2.2.7",
     "typescript": "3.4.5"
   },
